@@ -17,13 +17,19 @@ def Z01HJ( H, W, e_r):
     return z_0
 
 # Calculate Characteristic Impedance from Hammerstad-Jensen (simplified formula)
+"""
+H   strip height over dielectric
+W   strip width
+e_r is the relative permittivity of the dielectric
+#! CITE
+"""
 def microstripImpedanceHJ( H, W, e_r):
     e_eff = effectivePermittivityHJ( H, W, e_r)
     z_01 = Z01HJ(H, W, e_r)
     z_0 = z_01/np.sqrt(e_eff)
     return z_0
 
-# Calculate frequency dependendt effective permittivity form Yamashita
+# Calculate frequency dependendt effective permittivity form Yamashita (dispersion)
 def effectivePermittivityYa( H, W, e_r, f):
     e_eff = effectivePermittivityHJ( H, W, e_r)
 
@@ -32,6 +38,13 @@ def effectivePermittivityYa( H, W, e_r, f):
     return e_eff_freq
 
 # Calculate frequency dependendt Characteristic Impedance form Yamashita
+"""
+H   strip height over dielectric
+W   strip width
+e_r is the relative permittivity of the dielectric
+Accurate within 1% for 0.1 < f < 100 [GHz]
+#! CITE
+"""
 def microstripImpedanceYa( H, W, e_r, f):
     e_eff_freq = effectivePermittivityYa(H, W, e_r, f)
     z_01 = Z01HJ(H, W, e_r)
