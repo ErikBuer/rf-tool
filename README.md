@@ -2,7 +2,7 @@
 RF electronics calculator
 
 Calculate static or frequency dependent characteristic impedance for microstip lines.
-Based on the empirical formulas of Hammerstad-Jensen and yamashita.
+Based on the empirical effective permittivity and impedance formulas of Hammerstad-Jensen, and the empirical dispersion formula of yamashita.
 
 ## Basic Usage:
 ```
