@@ -76,7 +76,7 @@ Accurate within 0.2 dB for:
 1       <= N    < 8096
 - M. A. Richards and J. A. Scheer and W. A. Holm, Principles of Modern Radar, SciTech Publishing, 2010 
 """
-def Albersheim( self, Pfa, Pd, N ):
+def Albersheim( Pfa, Pd, N ):
     A = np.log(0.062/Pfa)
     B = np.log(Pd/1-Pd)
     SNRdB = -5*np.log10(N)+(6.2+(4.54/np.sqrt(N+0.44)))*np.log10(A+(0.12*A*B)+(0.7*B))

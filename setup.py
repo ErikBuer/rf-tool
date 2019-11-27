@@ -1,11 +1,11 @@
 from setuptools import setup
 
 setup(name='rf-tool',
-      version='0.0.1',
+      version='0.0.2',
       description='RF electronics calculator',
       url='https://github.com/ErikBuer/rf-tool',
       author='Erik Buer',
-      author_email='',
+      author_email='erik.buer@norskdatateknikk.no',
       license='GPL',
       packages=['rf-tool'],
       zip_safe=False,
