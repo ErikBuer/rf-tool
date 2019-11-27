@@ -13,7 +13,12 @@ pip install rf-tool
 ## Basic Usage:
 ```
 import rf-tool as rf
+# Static impedance
+Z_static = rf.microstripImpedanceHJ( H, W, e_r )
 
-Z_static = rf.microstripImpedanceHJ(0.1, 0.1, 4.2)
-Z_100M = rf.microstripImpedanceYa(0.1, 0.1, 4.2, 100e6)
+# Frequency dependent impedance calculation
+Z_100M = rf.microstripImpedanceYa( H, W, e_r, f)
+
+# Albersheim
+SNRdB = rf.Albersheim( Pfa, Pd, N )
 ```
