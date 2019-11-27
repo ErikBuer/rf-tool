@@ -7,6 +7,6 @@ setup(name='rf-tool',
       author='Erik Buer',
       author_email='erik.buer@norskdatateknikk.no',
       license='GPL',
-      packages=['rf-tool'],
+      packages=['rftool'],
       zip_safe=False,
       install_requires     = [ 'numpy','scipy'])
