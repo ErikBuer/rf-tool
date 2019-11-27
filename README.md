@@ -6,8 +6,8 @@ Based on the empirical effective permittivity and impedance formulas of Hammerst
 
 ## Basic Usage:
 ```
-import rfTool as rfT
+import rf-tool as rf
 
-Z_static = rfT.microstripImpedanceHJ(0.1, 0.1, 4.2)
-Z_100M = rfT.microstripImpedanceYa(0.1, 0.1, 4.2, 100e6)
+Z_static = rf.microstripImpedanceHJ(0.1, 0.1, 4.2)
+Z_100M = rf.microstripImpedanceYa(0.1, 0.1, 4.2, 100e6)
 ```
