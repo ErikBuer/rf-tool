@@ -1,4 +1,4 @@
-# RF Tool
+# rf-tool
 RF electronics calculator
 
 Calculate static or frequency dependent characteristic impedance for microstip lines.
