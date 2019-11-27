@@ -12,7 +12,7 @@ pip install rf-tool
 
 ## Basic Usage:
 ```
-import rf-tool as rf
+import rftool as rf
 # Static impedance
 Z_static = rf.microstripImpedanceHJ( H, W, e_r )
 
