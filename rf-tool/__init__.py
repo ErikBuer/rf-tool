@@ -7,7 +7,7 @@ import scipy.constants as const
 - T. C. Edwards and M. B. Steer, Foundations for microstrip circuit design, fourth edition, Wiley, 2016
 """
 def effectivePermittivityHJ(H, W, e_r):
-    e_eff = np.divide((e_r+1),2) + np.divide((e_r-1),2)*np.divide(1,np.sqrt(1+(12*H/W)))
+    e_eff = np.divide((e_r+1),2) + np.divide((e_r-1),2)*np.divide(1,np.sqrt(1+(12*np.divide(H,W))))
     return e_eff
 
 # Calculate Z01 from Hammerstad-Jensen (simplified formula)
@@ -20,7 +20,7 @@ e_r is the relative permittivity of the dielectric
 def Z01HJ( H, W, e_r):
     e_eff = effectivePermittivityHJ( H, W, e_r)
     u = np.divide(W,H)
-    F1 = 6+(2*np.pi-6)*np.exp(-np.power((30.666/u), 0.7528))
+    F1 = 6+(2*np.pi-6)*np.exp(-np.power(np.divide(30.666,u), 0.7528))
     z_01 = 60*np.log( np.divide(F1, u) + np.sqrt(1+np.power(np.divide(2,u),2)) )
     return z_01
 
@@ -34,7 +34,7 @@ e_r is the relative permittivity of the dielectric
 def microstripImpedanceHJ( H, W, e_r):
     e_eff = effectivePermittivityHJ( H, W, e_r)
     z_01 = Z01HJ(H, W, e_r)
-    z_0 = z_01/np.sqrt(e_eff)
+    z_0 = np.divide(z_01,np.sqrt(e_eff))
     return z_0
 
 # Calculate frequency dependendt effective permittivity form Yamashita (dispersion)
@@ -48,8 +48,8 @@ f   is the fignal frequency [Hz]
 def effectivePermittivityYa( H, W, e_r, f):
     e_eff = effectivePermittivityHJ( H, W, e_r)
 
-    F = ( (4*H*f*np.sqrt(e_eff-1))/(const.c) )*(0.5+(1+2*np.log10(1+(W/H)))**2)
-    e_eff_freq = ( (np.sqrt(e_r)-np.sqrt(e_eff)) / (1+4*F**(-1.5)) + np.sqrt(e_eff) )**2
+    F = np.divide( (4*H*f*np.sqrt(e_eff-1)), (const.c) )*(0.5+(1+2*np.log10(1+np.divide(W,H)))**2)
+    e_eff_freq = np.divide( (np.sqrt(e_r)-np.sqrt(e_eff)), (1+4*F**(-1.5)) + np.sqrt(e_eff) )**2
     return e_eff_freq
 
 # Calculate frequency dependendt Characteristic Impedance form Yamashita
@@ -77,7 +77,7 @@ Accurate within 0.2 dB for:
 - M. A. Richards and J. A. Scheer and W. A. Holm, Principles of Modern Radar, SciTech Publishing, 2010 
 """
 def Albersheim( Pfa, Pd, N ):
-    A = np.log(0.062/Pfa)
-    B = np.log(Pd/1-Pd)
-    SNRdB = -5*np.log10(N)+(6.2+(4.54/np.sqrt(N+0.44)))*np.log10(A+(0.12*A*B)+(0.7*B))
+    A = np.log(np.divide(0.062, Pfa))
+    B = np.log(np.divide(Pd,1-Pd))
+    SNRdB = -5*np.log10(N)+(6.2+np.divide(4.54, np.sqrt(N+0.44)))*np.log10(A+(0.12*A*B)+(0.7*B))
     return SNRdB
