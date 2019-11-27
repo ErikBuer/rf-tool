@@ -19,6 +19,6 @@ Z_static = rf.microstripImpedanceHJ( H, W, e_r )
 # Frequency dependent impedance calculation
 Z_100M = rf.microstripImpedanceYa( H, W, e_r, f)
 
-# Albersheim
+# Albersheim equation for required single pulse SNR
 SNRdB = rf.Albersheim( Pfa, Pd, N )
 ```
