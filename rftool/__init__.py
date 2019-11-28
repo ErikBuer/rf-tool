@@ -48,8 +48,8 @@ f   is the fignal frequency [Hz]
 def effectivePermittivityYa( h, w, e_r, f):
     e_eff = effectivePermittivityHJ( h, w, e_r)
 
-    F = np.divide( (4*h*f*np.sqrt(e_eff-1)), (const.c) )*(0.5+np.power(1+2*np.log10(1+np.divide(w,h)),2))
-    e_eff_freq = np.power(np.divide( (np.sqrt(e_r)-np.sqrt(e_eff)), 1+4*np.power(F,-1.5)) + np.sqrt(e_eff), 2)
+    F = np.divide( 4*h*f*np.sqrt(e_eff-1), const.c ) * (0.5+np.power( 1+2*np.log10(1+np.divide(w,h)), 2 ))
+    e_eff_freq = np.power(np.divide( np.sqrt(e_r)-np.sqrt(e_eff), 1+4*np.power(F,-1.5) ) + np.sqrt(e_eff), 2)
     return e_eff_freq
 
 # Calculate frequency dependendt Characteristic Impedance form Yamashita
@@ -82,7 +82,7 @@ f < 60 [GHz]
 """
 def microstripImpedanceKJ( h, w, e_r, f):
     e_eff = effectivePermittivityHJ( h, w, e_r)
-    F = np.divide(h, 1e9)
+    F = np.divide(f, 1e9)
     H = np.divide(h, 1e-2)
     P1 = 0.27488 + np.divide( 0.6315+0.525, np.power(1+0.157*F*H, 20))*np.divide(w,h) - 0.0065683*np.exp(-8.7513*np.divide(w,h))
     P2 = 0.33622*(1-np.exp(-0.03442*e_r))
