@@ -14,7 +14,6 @@ def effectivePermittivityHJ(h, w, e_r):
     return e_eff
 
 
-
 def Z01HJ( h, w, e_r):
     """
     Calculate Z01 from Hammerstad-Jensen (simplified formula).
@@ -62,6 +61,7 @@ def effectivePermittivityYa( h, w, e_r, f):
     e_eff_freq = np.power(np.divide( np.sqrt(e_r)-np.sqrt(e_eff), 1+4*np.power(F,-1.5) ) + np.sqrt(e_eff), 2)
     return e_eff_freq
 
+
 def microstripImpedanceYa( h, w, e_r, f):
     """
     Calculate frequency dependendt Characteristic Impedance form Yamashita.
@@ -79,7 +79,7 @@ def microstripImpedanceYa( h, w, e_r, f):
     Z_0_freq = np.divide( z_01, np.sqrt(e_eff_freq) )
     return Z_0_freq
 
- 
+
 def microstripImpedanceKJ( h, w, e_r, f):
     """
     Calculate frequency dependendt Characteristic Impedance form Kirschning and Jansen.
