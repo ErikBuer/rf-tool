@@ -29,7 +29,7 @@ def pow2db( power ):
     dB = 10*np.log10( power)
     return dB
 
-def db2Pow( dB ):
+def db2pow( dB ):
     """
     Conversion between logaithmic decibell and linear scale
     """
