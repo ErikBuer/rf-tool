@@ -1,5 +1,6 @@
 # rf-tool
-RF electronics calculator
+RF electronics calculator.
+Developed for python 3.
 
 Calculate static or frequency dependent characteristic impedance for microstip lines.
 Based on the empirical effective permittivity and impedance formulas of Hammerstad-Jensen, and the empirical dispersion formula of yamashita.
