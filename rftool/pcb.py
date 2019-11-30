@@ -80,7 +80,7 @@ def effectiveStripWidthHJ( h, w, t, e_r ):
     """
     delta_w_1 = np.divide(t*h, const.pi)*np.log( float(1 + np.divide( 4*const.e, t*np.power(mp.coth( np.sqrt( 6.517*np.divide(w,h) ) ),2) ) ))
     delta_w_r = np.divide(1,2)*( 1+np.divide( 1, mp.cosh(np.sqrt(e_r-1)) ) )*delta_w_1
-    w_eff = w + delta_w_r
+    w_eff = float(w + delta_w_r)
     return w_eff
 
 def shieldedMicrostripImpedanceHJ( h, w, t, a, b, e_r ):
@@ -221,3 +221,4 @@ def microstripImpedanceKJ( h, w, e_r, f ):
     z_01 = Z01HJ(h, w, e_r)
     Z_0_freq = np.divide( z_01, np.sqrt(e_eff_freq) )
     return Z_0_freq
+

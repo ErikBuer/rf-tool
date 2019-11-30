@@ -17,7 +17,7 @@ def mag2db( mag ):
 
 def db2mag( dB ):
     """
-    Conversion between logaithmic deci Bell and linear scale
+    Conversion between logaithmic decibell and linear scale
     """
     mag = np.power( 10, np.divide( dB, 20) )
     return mag
@@ -31,7 +31,7 @@ def pow2db( power ):
 
 def db2Pow( dB ):
     """
-    Conversion between logaithmic deci Bell and linear scale
+    Conversion between logaithmic decibell and linear scale
     """
     power = np.power( 10, np.divide( dB, 10) )
     return power
