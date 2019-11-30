@@ -12,6 +12,8 @@ pip install rf-tool
 ```
 
 ## Basic Usage:
+Use the help() function for description of inputs and valid range.
+
 ```
 import rftool as rf
 # Static impedance
