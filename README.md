@@ -49,13 +49,13 @@ SNRdB = Shnidman( Pfa, Pd, N, SW )
 ### Utility
 ```
 # Conversion between reflection coef. and VSWR
-rf.Gamma2VSWR( Gamma )
+VSWR = rf.Gamma2VSWR( Gamma )
 
 # Linear to log conversion 
-rf.mag2db( mag )
-rf.db2mag( dB )
+dB = rf.mag2db( mag )
+mag = rf.db2mag( dB )
 
-rf.pow2db( power )
-rf.db2Pow( dB )
+dB = rf.pow2db( power )
+mag = rf.db2Pow( dB )
 ```
 
