@@ -1,7 +1,17 @@
 import numpy as np
 import scipy.constants as const
+import mpmath as mp
 
-def effectivePermittivityHJ(h, w, e_r):
+def Gamma2VSWR( Gamma ):
+    """
+    Reflection coefficient to Voltage Standing Wave Ratio conversion
+    Gamma is the reflection coefficient.
+    """
+    VSWR = np.divide(1+abs(Gamma), 1-abs(Gamma))
+    return VSWR
+
+
+def effectivePermittivityHJ( h, w, e_r ):
     """
     Calculate effective permittivity from Hammerstad-Jensen (simplified formula).
 
@@ -14,9 +24,10 @@ def effectivePermittivityHJ(h, w, e_r):
     return e_eff
 
 
-def Z01HJ( h, w, e_r):
+def Z01HJ( h, w, e_r ):
     """
     Calculate Z01 from Hammerstad-Jensen (simplified formula).
+    Impedance instrip with air dielectric
 
     h   strip height over dielectric
     w   strip width
@@ -30,12 +41,22 @@ def Z01HJ( h, w, e_r):
     return z_01
 
 
-def microstripImpedanceHJ( h, w, e_r):
+def microstripImpedanceHJ( h, w, e_r ):
     """
     Calculate Characteristic Impedance from Hammerstad-Jensen (simplified formula).
+    
+                       w
+                   <-------->
+         e_0       +--------+                   
+                   |        |                   
+    +--------------+--------+--------------+ ^  
+    |                                      | |
+    |    e_r                               | | h
+    |                                      | |
+    +--------------------------------------+ v
 
-    h   strip height over dielectric
-    w   strip width
+    h is the strip height over dielectric
+    w is the strip width
     e_r is the relative permittivity of the dielectric
     - T. C. Edwards and M. B. Steer, Foundations for microstrip circuit design, fourth edition, Wiley, 2016
     """
@@ -45,7 +66,74 @@ def microstripImpedanceHJ( h, w, e_r):
     return z_0
 
 
-def effectivePermittivityYa( h, w, e_r, f):
+def effectiveStripWidthHJ( h, w, t, e_r ):
+    """
+    Calculate effective width w_eff for a microstrip of finite thickness. Hammerstad and Jenson's method.
+    This effective width can be used in microstripImpedanceHJ to take strip thickness into account.
+
+                       w
+                   <-------->
+         e_0       +--------+                   ^
+                   |        |                   | t
+    +--------------+--------+--------------+ ^  v
+    |                                      | |
+    |    e_r                               | | h
+    |                                      | |
+    +--------------------------------------+ v
+
+    t is the strip thickness
+    h is the strip height over dielectric
+    w is the strip width
+    e_r is the relative permittivity of the dielectric
+    - T. C. Edwards and M. B. Steer, Foundations for microstrip circuit design, fourth edition, Wiley, 2016
+    """
+    delta_w_1 = np.divide(t*h, const.pi)*np.log( float(1 + np.divide( 4*const.e, t*np.power(mp.coth( np.sqrt( 6.517*np.divide(w,h) ) ),2) ) ))
+    delta_w_r = np.divide(1,2)*( 1+np.divide( 1, mp.cosh(np.sqrt(e_r-1)) ) )*delta_w_1
+    w_eff = w + delta_w_r
+    return w_eff
+
+def shieldedMicrostripImpedanceHJ( h, w, t, a, b, e_r ):
+    """
+    Calculate Characteristic Impedance of microstrip in a metallic enclosure.
+    Hammerstad-Jensen (simplified formula) quasi-static impedance.
+    Using Hammerstad-Jensen effective width calculation.
+
+    +--------------------------------------+ ^
+    |                  w                   | |
+    |              <-------->              | | a
+    |    e_0       +--------+              | |   ^
+    |              |        |              | |   | t
+    +--------------+--------+--------------+ | ^ V
+    |                                      | | |
+    |    e_r                               | | | h
+    |                                      | | |
+    +--------------------------------------+ v v
+    <-------------------------------------->
+                   b
+    
+    h   strip height over dielectric
+    w   strip width
+    t is the strip thickness
+    a is the enclosure height
+    b is the enclosure width
+    e_r is the relative permittivity of the dielectric
+    - T. C. Edwards and M. B. Steer, Foundations for microstrip circuit design, fourth edition, Wiley, 2016
+    """
+    z_0u = microstripImpedanceHJ( h, w, e_r )
+    w_eff = effectiveStripWidthHJ( h, w, t, e_r )
+    h_prime = a-h
+    delta_z_0s1 = 270*( 1-np.tanh(0.28+1.2*np.sqrt(np.divide(h_prime,h))) )
+    delta_z_0s2 = delta_z_0s1*( 1-np.tanh(float(1+np.divide( 0.48*np.power(np.divide(w_eff, h)-1,0.5), np.power(1+np.divide(h_prime, h), 2) ))) )
+
+    if np.divide(w,h)>1.3:
+        z_0 = z_0u-delta_z_0s1
+    else:
+        z_0 = z_0u-delta_z_0s2
+
+    return z_0
+
+
+def effectivePermittivityYa( h, w, e_r, f ):
     """
     Calculate frequency dependendt effective permittivity form Yamashita (dispersion).
 
@@ -55,14 +143,14 @@ def effectivePermittivityYa( h, w, e_r, f):
     f   is the fignal frequency [Hz]
     - T. C. Edwards and M. B. Steer, Foundations for microstrip circuit design, fourth edition, Wiley, 2016
     """
-    e_eff = effectivePermittivityHJ( h, w, e_r)
+    e_eff = effectivePermittivityHJ( h, w, e_r )
 
     F = np.divide( 4*h*f*np.sqrt(e_eff-1), const.c ) * (0.5+np.power( 1+2*np.log10(1+np.divide(w,h)), 2 ))
     e_eff_freq = np.power(np.divide( np.sqrt(e_r)-np.sqrt(e_eff), 1+4*np.power(F,-1.5) ) + np.sqrt(e_eff), 2)
     return e_eff_freq
 
 
-def microstripImpedanceYa( h, w, e_r, f):
+def microstripImpedanceYa( h, w, e_r, f ):
     """
     Calculate frequency dependendt Characteristic Impedance form Yamashita.
 
@@ -80,7 +168,7 @@ def microstripImpedanceYa( h, w, e_r, f):
     return Z_0_freq
 
 
-def microstripImpedanceKJ( h, w, e_r, f):
+def microstripImpedanceKJ( h, w, e_r, f ):
     """
     Calculate frequency dependendt Characteristic Impedance form Kirschning and Jansen.
 

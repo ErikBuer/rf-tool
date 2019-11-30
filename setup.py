@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='rf-tool',
-      version='0.0.6',
+      version='0.0.7',
       description='RF electronics calculator',
       url='https://github.com/ErikBuer/rf-tool',
       author='Erik Buer',
@@ -9,4 +9,4 @@ setup(name='rf-tool',
       license='GPL',
       packages=['rftool'],
       zip_safe=False,
-      install_requires     = [ 'numpy','scipy'])
+      install_requires     = [ 'numpy','scipy', 'mpmath'])
