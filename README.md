@@ -16,18 +16,46 @@ Use the help() function for description of inputs and valid range.
 
 ```
 import rftool as rf
-# Static impedance
+```
+
+### PCB Tools
+```
+# Quasi static impedance, Hammerstad and Jensen's method.
 Z_static = rf.microstripImpedanceHJ( h, w, e_r )
+
+# Calcultate the effective width, accounting for the microstrip height, Hammerstad and Jensen's method.
+w_eff = rf.effectiveStripWidthHJ( h, w, t, e_r )
+
+# Quasi static impedance of microstrip in metallic enclosure.
+Z_static = rf.shieldedMicrostripImpedanceHJ( h, w, t, a, b, e_r )
 
 # Frequency dependent impedance calculation (Yamashita dispersion)
 Z_100M = rf.microstripImpedanceYa( h, w, e_r, f)
 
 # Frequency dependent impedance calculation (Kirschning and Jansen dispersion)
-Z_100M = rf.microstripImpedanceKJ( h, w, e_r, f):
+Z_100M = rf.microstripImpedanceKJ( h, w, e_r, f)
 
+```
+
+### Radar Tools
+```
 # Albersheim's equation for required SNR with incoherent integration
 SNRdB = rf.Albersheim( Pfa, Pd, N )
 
 # Shnidman's equation for required SNR with incoherent integration, swerling 0-5
-SNRdB = Shnidman( Pfa, Pd, N, SW ):
+SNRdB = Shnidman( Pfa, Pd, N, SW )
 ```
+
+### Utility
+```
+# Conversion between reflection coef. and VSWR
+rf.Gamma2VSWR( Gamma )
+
+# Linear to log conversion 
+rf.mag2db( mag )
+rf.db2mag( dB )
+
+rf.pow2db( power )
+rf.db2Pow( dB )
+```
+
