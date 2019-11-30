@@ -23,6 +23,9 @@ Z_100M = rf.microstripImpedanceYa( h, w, e_r, f)
 # Frequency dependent impedance calculation (Kirschning and Jansen dispersion)
 Z_100M = rf.microstripImpedanceKJ( h, w, e_r, f):
 
-# Albersheim equation for required SNR with uncoherent integration
+# Albersheim's equation for required SNR with incoherent integration
 SNRdB = rf.Albersheim( Pfa, Pd, N )
+
+# Shnidman's equation for required SNR with incoherent integration, swerling 0-5
+SNRdB = Shnidman( Pfa, Pd, N, SW ):
 ```
