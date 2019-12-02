@@ -6,9 +6,9 @@ def effectivePermittivityHJ( h, w, e_r ):
     """
     Calculate effective permittivity from Hammerstad-Jensen (simplified formula).
 
-    h   strip height over dielectric
-    w   strip width
-    e_r is the relative permittivity of the dielectric
+    h   strip height over dielectric.
+    w   strip width.
+    e_r is the relative permittivity of the dielectric.
     - T. C. Edwards and M. B. Steer, Foundations for microstrip circuit design, fourth edition, Wiley, 2016
     """
     e_eff = np.divide((e_r+1),2) + np.divide((e_r-1),2)*np.divide(1,np.sqrt(1+(12*np.divide(h,w))))
@@ -18,11 +18,11 @@ def effectivePermittivityHJ( h, w, e_r ):
 def Z01HJ( h, w, e_r ):
     """
     Calculate Z01 from Hammerstad-Jensen (simplified formula).
-    Impedance instrip with air dielectric
+    Impedance instrip with air dielectric.
 
-    h   strip height over dielectric
-    w   strip width
-    e_r is the relative permittivity of the dielectric
+    h   strip height over dielectric.
+    w   strip width.
+    e_r is the relative permittivity of the dielectric.
     - T. C. Edwards and M. B. Steer, Foundations for microstrip circuit design, fourth edition, Wiley, 2016
     """
     e_eff = effectivePermittivityHJ( h, w, e_r)
@@ -46,9 +46,9 @@ def microstripImpedanceHJ( h, w, e_r ):
     |                                      | |
     +--------------------------------------+ v
 
-    h is the strip height over dielectric
-    w is the strip width
-    e_r is the relative permittivity of the dielectric
+    h is the strip height over dielectric.
+    w is the strip width.
+    e_r is the relative permittivity of the dielectric.
     - T. C. Edwards and M. B. Steer, Foundations for microstrip circuit design, fourth edition, Wiley, 2016
     """
     e_eff = effectivePermittivityHJ( h, w, e_r)
@@ -72,10 +72,10 @@ def effectiveStripWidthHJ( h, w, t, e_r ):
     |                                      | |
     +--------------------------------------+ v
 
-    t is the strip thickness
-    h is the strip height over dielectric
-    w is the strip width
-    e_r is the relative permittivity of the dielectric
+    t is the strip thickness.
+    h is the strip height over dielectric.
+    w is the strip width.
+    e_r is the relative permittivity of the dielectric.
     - T. C. Edwards and M. B. Steer, Foundations for microstrip circuit design, fourth edition, Wiley, 2016
     """
     delta_w_1 = np.divide(t*h, const.pi)*np.log( float(1 + np.divide( 4*const.e, t*np.power(mp.coth( np.sqrt( 6.517*np.divide(w,h) ) ),2) ) ))
@@ -102,12 +102,12 @@ def shieldedMicrostripImpedanceHJ( h, w, t, a, b, e_r ):
     <-------------------------------------->
                    b
     
-    h   strip height over dielectric
-    w   strip width
-    t is the strip thickness
-    a is the enclosure height
-    b is the enclosure width
-    e_r is the relative permittivity of the dielectric
+    h   strip height over dielectric.
+    w   strip width.
+    t is the strip thickness.
+    a is the enclosure height.
+    b is the enclosure width.
+    e_r is the relative permittivity of the dielectric.
     - T. C. Edwards and M. B. Steer, Foundations for microstrip circuit design, fourth edition, Wiley, 2016
     """
     z_0u = microstripImpedanceHJ( h, w, e_r )
@@ -138,10 +138,10 @@ def effectivePermittivityYa( h, w, e_r, f ):
     |                                      | |
     +--------------------------------------+ v
 
-    h   strip height over dielectric [M]
-    w   strip width [M]
-    e_r is the relative permittivity of the dielectric
-    f   is the fignal frequency [Hz]
+    h   strip height over dielectric [M].
+    w   strip width [M].
+    e_r is the relative permittivity of the dielectric.
+    f   is the fignal frequency [Hz].
     - T. C. Edwards and M. B. Steer, Foundations for microstrip circuit design, fourth edition, Wiley, 2016
     """
     e_eff = effectivePermittivityHJ( h, w, e_r )
@@ -165,10 +165,10 @@ def microstripImpedanceYa( h, w, e_r, f ):
     |                                      | |
     +--------------------------------------+ v
 
-    h   strip height over dielectric [M]
-    w   strip width [M]
-    e_r is the relative permittivity of the dielectric
-    f   is the fignal frequency [Hz]
+    h   strip height over dielectric [M].
+    w   strip width [M].
+    e_r is the relative permittivity of the dielectric.
+    f   is the fignal frequency [Hz].
 
     Accurate within 1% for 0.1 < f < 100 [GHz]
     - T. C. Edwards and M. B. Steer, Foundations for microstrip circuit design, fourth edition, Wiley, 2016
@@ -193,9 +193,9 @@ def microstripImpedanceKJ( h, w, e_r, f ):
     |                                      | |
     +--------------------------------------+ v
 
-    h   strip height over dielectric [M]
-    w   strip width
-    e_r is the relative permittivity of the dielectric
+    h   strip height over dielectric [M].
+    w   strip width.
+    e_r is the relative permittivity of the dielectric.
     f   is the fignal frequency [Hz]
 
     Accurate within 0.6% for:
@@ -221,4 +221,56 @@ def microstripImpedanceKJ( h, w, e_r, f ):
     z_01 = Z01HJ(h, w, e_r)
     Z_0_freq = np.divide( z_01, np.sqrt(e_eff_freq) )
     return Z_0_freq
+
+
+def coupledMicrostripOddImpedanceHJ( h, w, s, e_r, f ):
+    """
+    Calculate quasi-static odd impedance (Hammerstad and Jansen's method).
+
+                       s
+             w     <-------->          e_0
+         <-------->
+         +--------+          +--------+
+         |        |          |        |
+    +----+--------+----------+--------+----+ ^
+    |                                      | |
+    |    e_r                               | | h
+    |                                      | |
+    +--------------------------------------+ v
+
+    h is the strip height over dielectric [M]
+    w is the strip width. 
+    s is the strip separation.
+    e_r is the relative permittivity of the dielectric.
+    - T. C. Edwards and M. B. Steer, Foundations for microstrip circuit design, fourth edition, Wiley, 2016
+    """
+
+    # TODO 
+    u = w/h
+    g = s/h
+    q = np.exp(-1.366-g)
+    r = 1 + 0.15(1-np.divide(np.exp(1-np.power(e_r-1, 2), 8.2), 1+np.power(g, -6)))
+    p = np.divide( np.exp(-0.745*np.power(g, 0.295)), np.cosh(np.power(g, 0.68)) )
+    f_o1 = 1 - np.exp(-0.179*np.power(g, 0.15)-np.divide(0.328*np.power(g, r), np.log(np.exp(1)+np.power(np.divide(g,7),2.8))))
+    f_o = f_o1*np.exp(p*np.log(u)+q*np.sin(const.pi*np.divide(np.log(u), np.log(10))))
+    n = (np.divide(1,17, 7)+np.exp(-6.424-0.76*np.log(g)-np.power(np.divide(g, 0.23), 5))) * np.log(np.divide(10+68*np.power(g, 2), 1+32.5*np.power(g, 3.093)))
+    m = 0.2175 + np.power(4.113 + np.power(np.divide(20.36, g), 6), -0.251) + np.divide(1, 323)*np.log(np.divide(np.power(g, 10), 1 + np.power(np.divide(g, 13.8), 10)))
+    beta = 0.2306 + np.divide(1,301.8)*np.log(np.divide(np.power(g,10),1+np.power(np.divide(g, 3.73), 10))) + np.divide(1, 5.3)*np.log(1+0.646*np.power(g, 1.175))
+    theta = 1.729+1.175*np.log(1+np.divide( 0.627, g + 0.327*np.power(g, 2.17) ))
+    a = 1 + np.divide(1, 49) * np.log(np.divide(np.power(u,4)+np.power(np.divide(u,52), 2), np.power(u,4)+0.432)) + np.divide(1, 18.7)*np.log(1+np.power(np.divide(u, 18.1), 3))
+    b = 0.564*np.power(np.divide(e_r-0.9, e_r+3), 0.053)
+    alpha = 0.5*np.exp(-g)
+    Psi = 1 + np.divide(g, 1.45) + np.divide(np.power(g, 2.09), 3.95)
+    phi = 0.8645*np.power(u, 0.1472)
+    Phi_e = np.divide(phi, Psi*(alpha*np.power(u, m) + (1-alpha)*np.power(u, -m)))
+    Phi_o = Phi_e-np.divide(theta, Psi)*np.exp(beta*np.power(u, n)*np.log(u))
+    F_o = f_o*np.power( 1+np.divide(10, u), -a*b )
+    e_eff_odd = np.divide(e_r+1, 2) + np.divide(e_r-1, 2)*F_o
+    eta_0 = 
+    z01 = microstripImpedanceHJ( h, w, e_r )
+    z01_o = np.divide(z01, 1-np.divide(z01*Phi_o, eta_0))
+    z0_o = np.divide(z01_o, np.sqrt(e_eff_odd))
+
+    return z0_o
+
 
