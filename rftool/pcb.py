@@ -266,7 +266,7 @@ def coupledMicrostripOddImpedanceHJ( h, w, s, e_r, f ):
     Phi_o = Phi_e-np.divide(theta, Psi)*np.exp(beta*np.power(u, n)*np.log(u))
     F_o = f_o*np.power( 1+np.divide(10, u), -a*b )
     e_eff_odd = np.divide(e_r+1, 2) + np.divide(e_r-1, 2)*F_o
-    eta_0 = 
+    eta_0 = const.pi*119.9169832                # intrinsic impedance of free space
     z01 = microstripImpedanceHJ( h, w, e_r )
     z01_o = np.divide(z01, 1-np.divide(z01*Phi_o, eta_0))
     z0_o = np.divide(z01_o, np.sqrt(e_eff_odd))
