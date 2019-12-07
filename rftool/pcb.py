@@ -223,7 +223,7 @@ def microstripImpedanceKJ( h, w, e_r, f ):
     return Z_0_freq
 
 
-def coupledMicrostripOddImpedanceHJ( h, w, s, e_r, f ):
+def coupledMicrostripOddImpedanceHJ( h, w, s, e_r):
     """
     Calculate quasi-static odd impedance (Hammerstad and Jansen's method).
 
@@ -245,15 +245,14 @@ def coupledMicrostripOddImpedanceHJ( h, w, s, e_r, f ):
     - T. C. Edwards and M. B. Steer, Foundations for microstrip circuit design, fourth edition, Wiley, 2016
     """
 
-    # TODO 
-    u = w/h
-    g = s/h
+    u = np.divide(w,h)
+    g = np.divide(s,h)
     q = np.exp(-1.366-g)
-    r = 1 + 0.15(1-np.divide(np.exp(1-np.power(e_r-1, 2), 8.2), 1+np.power(g, -6)))
+    r = 1 + 0.15*(1-np.divide(np.exp(1-np.divide(np.power(e_r-1, 2), 8.2)), 1+np.power(g, -6)))
     p = np.divide( np.exp(-0.745*np.power(g, 0.295)), np.cosh(np.power(g, 0.68)) )
     f_o1 = 1 - np.exp(-0.179*np.power(g, 0.15)-np.divide(0.328*np.power(g, r), np.log(np.exp(1)+np.power(np.divide(g,7),2.8))))
     f_o = f_o1*np.exp(p*np.log(u)+q*np.sin(const.pi*np.divide(np.log(u), np.log(10))))
-    n = (np.divide(1,17, 7)+np.exp(-6.424-0.76*np.log(g)-np.power(np.divide(g, 0.23), 5))) * np.log(np.divide(10+68*np.power(g, 2), 1+32.5*np.power(g, 3.093)))
+    n = (np.divide(1,17.7)+np.exp(-6.424-0.76*np.log(g)-np.power(np.divide(g, 0.23), 5))) * np.log(np.divide(10+68*np.power(g, 2), 1+32.5*np.power(g, 3.093)))
     m = 0.2175 + np.power(4.113 + np.power(np.divide(20.36, g), 6), -0.251) + np.divide(1, 323)*np.log(np.divide(np.power(g, 10), 1 + np.power(np.divide(g, 13.8), 10)))
     beta = 0.2306 + np.divide(1,301.8)*np.log(np.divide(np.power(g,10),1+np.power(np.divide(g, 3.73), 10))) + np.divide(1, 5.3)*np.log(1+0.646*np.power(g, 1.175))
     theta = 1.729+1.175*np.log(1+np.divide( 0.627, g + 0.327*np.power(g, 2.17) ))
