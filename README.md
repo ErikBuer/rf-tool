@@ -45,6 +45,21 @@ SNRdB = radar.Albersheim( Pfa, Pd, N )
 SNRdB = radar.Shnidman( Pfa, Pd, N, SW )
 ```
 
+### Digital Communications
+```
+import rftool.communications as comm
+
+# Calculate probability of error in AWGN for various modulations
+Perror = comm.errorProbabilityBpsk( EbN0 )
+Perror = comm.errorProbabilityQpsk( EbN0 )
+Perror = comm.errorProbabilityMPsk( EbN0, M )
+Perror = comm.errorProbabilityFsk( EbN0 )
+Perror = comm.errorProbabilityCoherentFsk( EbN0 )
+Perror = comm.errorProbabilityCoherentMFsk( EbN0, M )
+Perror = comm.errorProbabilityGMSK( EbN0 )
+Perror = comm.errorProbabilityQam( EbN0 , M)
+```
+
 ### Utility
 ```
 from rftool.utility import *
