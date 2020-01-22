@@ -1,4 +1,8 @@
+from scipy.signal import hilbert
+import matplotlib.pyplot as plt
 import numpy as np
+from pyhht.visualization import plot_imfs   # Hilbert-Huang TF analysis
+from pyhht import EMD                       # Hilbert-Huang TF analysis
 
 def Albersheim( Pfa, Pd, N ):
     """
@@ -75,5 +79,47 @@ def Shnidman( Pfa, Pd, N, SW ):
     X1= np.divide(C*X_inf, N)
     
     SNRdB = 10*np.log10(X1)
-
     return SNRdB
+
+def hilbert_spectrum(sig, Fs=1):
+    """
+    Hilbert-Huang transform with Hilbert spectral plot.
+    The plot cuts off negative frequencies.
+    
+    sig is a time series
+    Fs is the sample frequency
+
+    based on:
+    S.E. Hamdi et. al, Hilbert-Huang Transform versus Fourier based analysis for diffused ultrasonic waves structural health monitoring in polymer based composite materials,Proceedings of the Acoustics 2012 Nantes Conference.
+    """
+
+    # Hilbert-Huang
+    decomposer = EMD(sig)
+    imfs = decomposer.decompose()
+    #plot_imfs(sig, imfs, t)
+
+    imfAngle = np.angle(hilbert(imfs))
+    dt = np.divide(1,Fs)
+    
+    t = np.linspace(0, (sig.shape[0]-1)*dt, sig.shape[0])
+
+    # Calculate instantaneous frequency
+    instFreq = np.divide(np.gradient(imfAngle,t,axis=1), 2*np.pi)
+    """
+    There is an image of the instantaneous frequency response occuring at -Fs/2. THis is currently not shown in the plot. 
+    """
+
+    # Calculate Hilbert spectrum
+    # Time, frequency, magnitude
+
+    intensity = np.absolute(hilbert(imfs))
+    plt.figure()
+    for i in range(np.size(instFreq,0)):
+        plt.scatter(t, instFreq[i], c=intensity[i], alpha=0.3)
+
+    plt.title("Hilbert Spectrum")
+    plt.xlabel('t [s]')
+    plt.ylabel('f [Hz]')
+    plt.ylim(0,np.divide(Fs,2))
+    plt.tight_layout()
+    plt.show()

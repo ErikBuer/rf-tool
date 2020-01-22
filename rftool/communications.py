@@ -49,7 +49,6 @@ def errorProbabilityCoherentFsk( EbN0 ):
     Pe = Q(np.sqrt( EbN0 ))
     return Pe
 
-
 def errorProbabilityCoherentMFsk( EbN0, M ):
     """
     Probability of error in AWGN as a function of Eb/N0 for coherent M-ary Frequency Shift Keying (M-FSK).
@@ -67,7 +66,7 @@ def errorProbabilityGMSK( EbN0 ):
     Pe = Q(np.sqrt(2*gamma*EbN0))
     return Pe
 
-def errorProbabilityQam( EbN0 , M):
+def errorProbabilityQam( EbN0 , M ):
     """
     Probability of error in AWGN as a function of Eb/N0 with the minimum Eb and order M for Quadrature Amplitude Modulaion (QAM).
     - T. S. Rappaport, Wireless Communications Principles and Practice, 2nd ed, Prentice Hall, 1995
