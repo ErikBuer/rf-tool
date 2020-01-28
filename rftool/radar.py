@@ -1,8 +1,11 @@
-from scipy.signal import hilbert
+import scipy.signal as signal
+import scipy.optimize as optimize
 import matplotlib.pyplot as plt
 import numpy as np
 from pyhht.visualization import plot_imfs   # Hilbert-Huang TF analysis
 from pyhht import EMD                       # Hilbert-Huang TF analysis
+import rftool.utility as util
+import timeit       # t&d
 
 def Albersheim( Pfa, Pd, N ):
     """
@@ -81,16 +84,29 @@ def Shnidman( Pfa, Pd, N, SW ):
     SNRdB = 10*np.log10(X1)
     return SNRdB
 
-def hilbert_spectrum(sig, Fs=1):
+def upconvert( sig, f_c, Fs=1 ):
+    """
+    Upconvert baseband waveform to IF
+    f_c is the IF center frequency
+    Fs is the sample frequency
+    """
+    a = np.linspace(0, sig.shape[0]-1, sig.shape[0])
+    # Angular increments per sample times sample number
+    phi_j = 2*np.pi*np.divide(f_c,Fs)*a
+    # Complex IF carrier
+    sig = np.multiply(sig, np.exp(1j*phi_j))
+    return sig
+
+def hilbert_spectrum( sig, Fs=1 ):
     """
     Hilbert-Huang transform with Hilbert spectral plot.
-    The plot cuts off negative frequencies.
+    The plot neglects negative frequencies.
     
     sig is a time series
     Fs is the sample frequency
 
-    based on:
-    S.E. Hamdi et. al, Hilbert-Huang Transform versus Fourier based analysis for diffused ultrasonic waves structural health monitoring in polymer based composite materials,Proceedings of the Acoustics 2012 Nantes Conference.
+    Based on:
+    - S.E. Hamdi et al., Hilbert-Huang Transform versus Fourier based analysis for diffused ultrasonic waves structural health monitoring in polymer based composite materials,Proceedings of the Acoustics 2012 Nantes Conference.
     """
 
     # Hilbert-Huang
@@ -98,7 +114,7 @@ def hilbert_spectrum(sig, Fs=1):
     imfs = decomposer.decompose()
     #plot_imfs(sig, imfs, t)
 
-    imfAngle = np.angle(hilbert(imfs))
+    imfAngle = np.angle(signal.hilbert(imfs))
     dt = np.divide(1,Fs)
     
     t = np.linspace(0, (sig.shape[0]-1)*dt, sig.shape[0])
@@ -112,10 +128,10 @@ def hilbert_spectrum(sig, Fs=1):
     # Calculate Hilbert spectrum
     # Time, frequency, magnitude
 
-    intensity = np.absolute(hilbert(imfs))
+    intensity = np.absolute(signal.hilbert(imfs))
     plt.figure()
     for i in range(np.size(instFreq,0)):
-        plt.scatter(t, instFreq[i], c=intensity[i], alpha=0.3)
+        plt.scatter(t, instFreq[i], c=intensity[i], s=5, alpha=0.3)
 
     plt.title("Hilbert Spectrum")
     plt.xlabel('t [s]')
@@ -123,3 +139,261 @@ def hilbert_spectrum(sig, Fs=1):
     plt.ylim(0,np.divide(Fs,2))
     plt.tight_layout()
     plt.show()
+
+def ACF(x, singleSided = True, plot = True):
+    """
+    Normalized autocorrelation Function of input x
+    x is the signal being analyzed.
+    singleSided decides wether to return the -inf to inf ACF or 0 to inf ACF.
+    plot decides wether to plot the result.
+    """
+    r_xx = np.correlate(x, x, mode='full')
+
+    if singleSided == True:
+        r_xx = r_xx[len(rxx/2):]
+
+    if plot == True:
+        # Normalize
+        r_xx = np.absolute(r_xx / abs(r_xx).max())
+        # Plot
+        plt.figure()
+        plt.plot(util.mag2db(r_xx))
+        plt.title("Autocorrelation Function")
+        plt.ylabel("Normalized magnitude [dB]")
+        plt.show()
+    return r_xx
+
+# TODO def AF(x, Fs=1, doppler = 2)
+    """
+    Ambuigity Function
+    x is the signal being analyzed.
+    Fs is the sampling frequency of the signal x [Hz].
+    doppler is the max doppler shift in Hz
+    """
+
+class chirp:
+    """
+    Object for generating linear and non-linear chirps.
+    """
+    c = np.array([1,1,1])
+    # FFT lenth for computation og magnitude spectrum.
+    fftLen = 2048
+
+    class target:
+        """
+        Object for storing the properties of the target chirp. Used in optimization aproach for coefficients.
+        """
+
+        def __init__( self,  magdB_f=1, f=1, order=6):
+            self.magdB_f = magdB_f
+            self.f = f
+            self.order = order
+
+    def __init__( self,  t_i=1, Fs=1 ):
+        """
+        t_i is the chirp duration [s].
+        Fs is the intended sampling frequency [Hz]. Fs must be at last twice the highest frequency in the input PSD. If Fs < 2*max(f), then Fs = 2*max(f)
+        """
+        self.t_i = t_i
+        self.Fs = Fs
+
+    def generate( self ):
+        """
+        Generate Non.Linear Frequency Modualted (NLFM) chirps based on a polynomial of arbitrary order.
+
+        t is the length of the chirp [s]
+        c is a vector of phase polynomial coefficients (arbitrary length)
+        Fs is the sampling frequency [Hz]
+
+        c[0] is the reference phase
+        c[1] is the reference frequency,
+        c[2] is the nominal constant chirp rate
+        
+        For symmetricsl PSD; c_n = 0 for odd n > 2, that is, for n = 3, 5, 7,…
+
+        - A .W. Doerry, Generating Nonlinear FM Chirp Waveforms for Radar, Sandia National Laboratories, 2006
+        """
+        c = self.c
+        dt = np.divide(1,self.Fs)        # seconds
+        t = np.linspace(-self.t_i/2, self.t_i/2-dt, np.intc(self.Fs*self.t_i))  # Time vector
+
+        phi_t = np.full(np.intc(self.t_i*self.Fs), c[-1])
+
+        c = np.flip(c)
+        c = np.delete(c, 1) # delete c_N
+        for c_n in np.nditer(c):
+            phi_t = c_n + util.indefIntegration(phi_t, dt)
+
+        gamma_t = np.gradient(phi_t,t)  # Instantaneous frequency
+        """
+        plt.figure
+        plt.plot(t, gamma_t)
+        plt.xlabel('t [s]')
+        plt.ylabel('f [Hz]')
+        plt.title("Instantaneous Frequency")
+        plt.show()
+        """
+        self.sig = np.exp(np.multiply(1j, phi_t))
+        return self.sig
+
+    def plotMagnitude( self, sig_t ):
+        sig_f = np.fft.fft(sig_t, self.fftLen)/self.fftLen
+        # Shift and normalize
+        sig_f = np.abs(np.fft.fftshift(sig_f / abs(sig_f).max()))
+        # Remove infinitesimally small components
+        sig_f = util.mag2db(np.maximum(sig_f, 1e-10))
+        f = np.linspace(-self.Fs/2, self.Fs/2, len(sig_f))
+        plt.figure()
+        plt.plot(f, sig_f)
+        plt.xlim([-self.Fs/2, self.Fs/2])
+        plt.title("Frequency response")
+        plt.ylabel("Normalized magnitude [dB]")
+        plt.xlabel("Frequency [Hz]")
+        plt.show()
+
+    def magdB( self, sig_t ):
+        """
+        Calculates normalized magnitude of the imput signal as a function of frequency
+
+        sig is the input signal to be analyzed
+        """
+        sig_f = np.fft.fft(sig_t, self.fftLen)/(self.fftLen)
+        # Shift and normalize
+        sig_f = np.abs(np.fft.fftshift(sig_f / abs(sig_f).max()))
+        # Remove infinitesimally small components
+        sig_f = util.mag2db(np.maximum(sig_f, 1e-10))
+        return sig_f
+
+    def getCoefficientsObjectiveFunction( self, c ):
+        """
+        Objective function for coefficient optimization
+        """
+
+        # For symmetricsl PSD; cn = 0 for odd n > 2, that is, for n = 3, 5, 7, …
+        # Nulling out these coefficients
+        
+        if (self.target.symm == True) and (len(c) > 3):
+            
+            for i in range(3, len(c)):
+                if (i % 2) == 1:
+                    c[i]=0
+
+        self.c = c
+
+        sig = self.generate()
+
+        """
+        plt.plot( self.target.f, self.target.magdB_f )
+        plt.plot( self.target.f, self.magdB(sig) )
+        plt.title("Frequency Response")
+        plt.ylabel("Normalized Magnitude [dB]")
+        plt.xlabel("Frequency [Hz]")
+        plt.show()
+        """
+        """
+        # The cost is the sum of MSE per frequency bin
+        errorVector = np.absolute(np.subtract(  self.target.magdB_f[self.target.index[0]:self.target.index[1]], self.magdB(sig)[self.target.index[0]:self.target.index[1]]))
+        #errorVectorFull = np.absolute(np.subtract(self.target.magdB_f, self.magdB(sig)))
+        # Square error
+        errorVector = np.power(errorVector, 1.5)
+        """
+        ACF(x, singleSided = True)
+        
+
+        cost = np.sum( errorVector )
+        return cost
+
+    def getCoefficients( self, magdB_f, f, symm, order=6, fftLen = 2048):
+        """
+        Calculate the necessary coefficients in order to generate a NLFM chirp with a specific magnitude envelope (in frequency domain). Chirp generated using rftool.radar.generate().
+        Coefficients are found through non-linear optimization.
+
+        PSD_f is the target spectral mask (vector) as a function of frequency [W/Hz].
+        f is the corresponding frequency vector [Hz].
+        order is the oder of the polynomial used to generate the chirp frequency characteristics. the length of c is order+1.
+        symm configures wether the intend PSD should be symmetrical. With a symmetrical target PSD, the result will be close to symmetrical even with symm set to false, 
+        however the dimentionality of the problem is reduced greatly by setting symm to True.
+        fftLen is the length of the FFT which will be used in comparison between the generated chirp spectral mask and the target mask.
+        """
+        self.fftLen = fftLen
+
+        # Initiate target chirp object 
+        target = self.target(magdB_f, f, order)
+        self.target.symm = symm
+        # Fs is the sampling frequency [Hz]. Fs must be at last twice the highest frequency in the input PSD. If Fs < 2*max(f), then Fs = 2*max(f)
+        if self.Fs < 2*np.amax(f):
+            self.Fs = 2*np.amax(f)
+
+        # Match the frequency separation between generated and target spectrums
+        targetFrequencySeparation = (f[-1]-f[1])/(len(f)-1)
+        signalFrequencySeperation = self.Fs/(self.fftLen-1)
+
+        # ensure that the frequency separation in the target magnitude series equals the fft of the signal.
+        if (targetFrequencySeparation != signalFrequencySeperation):
+            scale = targetFrequencySeparation/signalFrequencySeperation
+            length = np.intc(scale*len(f))
+
+            self.target.magdB_f = signal.resample(magdB_f, length)
+            self.target.f =  np.linspace(f[1], f[-1], length)
+
+        # Generate target vector of same format as self.magdB(sig) 
+        # sigLen = np.intc(self.Fs*self.t_i)
+        f = np.linspace(-self.Fs/2, (self.Fs/2), fftLen)
+        # Find position to place self.target.magdB_f in order to compare with self.magdB(sig)
+        closeness = np.absolute(np.subtract(f, self.target.f.min()))
+        index = closeness.argmin()
+        
+        # Create target array of full length. Bins outside of the input frequency envelope
+        a = np.full((index-1), self.target.magdB_f[0])
+        bLen = (fftLen-(index-1)-len(self.target.magdB_f) )
+        # Index of where the inserted spectral mask is located in the fft mask.
+        if bLen < 1:
+            self.target.index = np.array([index, index+len(self.target.magdB_f[0:(bLen)])])
+            self.target.magdB_f = np.concatenate(( a, self.target.magdB_f[0:(bLen)] ))
+        else:
+            self.target.index = np.array([index, index+len(self.target.magdB_f)])
+            b = np.full((fftLen-(index-1)-len(self.target.magdB_f)), self.target.magdB_f[-1])
+            self.target.magdB_f = np.concatenate(( a, self.target.magdB_f, b ))
+
+        self.target.f =  np.linspace(-self.Fs/2, self.Fs/2, len(self.target.magdB_f))
+
+        # optimization routine
+        """
+        Initial values:
+        For linear chirp then:
+        c[0] is the reference phase
+        c[1] is the reference frequency,
+        c[2] is the nominal constant chirp rate
+        """
+        
+        c0 = (np.random.rand( order+1 )-0.5)*2e3   # Initial values (random)
+        # Set reference frequency to the center frequency in the input magnitude spectral mask.
+        #c0[1] = self.target.f[self.target.magdB_f.argmax()]
+        c0[2] = self.target.f[self.target.magdB_f.argmax()]*50
+        """
+        # Inital random search
+        best_c = (np.random.rand( order+1 )-0.5)*2e3   # Initial values (random)
+        lowestCost = 1e9
+        for i in range(1, np.intc(10e3)):
+            c = (np.random.rand( order+1 )-0.5)*self.Fs   # Initial values (random)
+            cost = self.getCoefficientsObjectiveFunction(c)
+            if cost<lowestCost:
+                lowestCost = cost
+                print("Iteration ", i, "lowestCost = ", lowestCost)
+                best_c = c
+
+        c0 = best_c
+        """
+
+        res = optimize.minimize(self.getCoefficientsObjectiveFunction, c0, tol=1e-6, options={'maxiter': 10000, 'disp': True}) #  method='nelder-mead'
+        # Optimized parameters
+        # self.c=res.x
+
+        # development stuff
+        plt.plot( self.target.f, self.target.magdB_f )
+        plt.plot( self.target.f, self.magdB(self.sig) )
+        plt.title("Frequency Response")
+        plt.ylabel("Normalized Magnitude [dB]")
+        plt.xlabel("Frequency [Hz]")
+        plt.show()
+        return self.c

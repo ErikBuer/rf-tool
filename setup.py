@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='rf-tool',
-      version='0.0.13',
+      version='0.0.15',
       description='RF and signal processing functions',
       url='https://github.com/ErikBuer/rf-tool',
       author='Erik Buer',
