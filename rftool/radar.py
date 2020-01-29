@@ -150,7 +150,7 @@ def ACF(x, singleSided = True, plot = True):
     r_xx = np.correlate(x, x, mode='full')
 
     if singleSided == True:
-        r_xx = r_xx[len(rxx/2):]
+        r_xx = r_xx[np.intc(len(r_xx)/2):]
 
     if plot == True:
         # Normalize
@@ -184,8 +184,8 @@ class chirp:
         Object for storing the properties of the target chirp. Used in optimization aproach for coefficients.
         """
 
-        def __init__( self,  magdB_f=1, f=1, order=6):
-            self.magdB_f = magdB_f
+        def __init__( self,  r_xx_dB=1, f=1, order=6):
+            self.r_xx_dB = r_xx_dB
             self.f = f
             self.order = order
 
@@ -251,18 +251,44 @@ class chirp:
         plt.xlabel("Frequency [Hz]")
         plt.show()
 
-    def magdB( self, sig_t ):
+    def PSD( self, sig_t, plot=False ):
         """
-        Calculates normalized magnitude of the imput signal as a function of frequency
+        Calculates Power Spectral Density in dBW/Hz.
+        """
+        f, psd = signal.welch(sig_t, fs=self.Fs, nfft=self.fftLen, nperseg=self.fftLen, return_onesided=False)
 
-        sig is the input signal to be analyzed
+        
+        if plot == True:
+            #f = np.linspace(-self.Fs/2, self.Fs/2, len(psd))
+            # Remove infinitesimally small components
+            #psd_dB = util.pow2db(np.maximum(psd, 1e-14))
+            psd_dB = util.pow2db(psd)
+            plt.plot(f, psd_dB)
+            plt.title("Welch's PSD Estimate")
+            plt.ylabel("dBW/Hz")
+            plt.xlabel("Frequency [Hz]")
+            plt.show()
+        return psd
+
+    def ACFdB( self, sig_t, plot=False ):
         """
-        sig_f = np.fft.fft(sig_t, self.fftLen)/(self.fftLen)
+        Calculates normalized ACF in dB based on FFT downsampling.
+        sig_t is the time-domain input signal.
+        """
+        psd = self.PSD(sig_t)
+        r_xx = np.fft.ifft(psd, self.fftLen)
         # Shift and normalize
-        sig_f = np.abs(np.fft.fftshift(sig_f / abs(sig_f).max()))
-        # Remove infinitesimally small components
-        sig_f = util.mag2db(np.maximum(sig_f, 1e-10))
-        return sig_f
+        r_xx = np.abs(np.fft.fftshift(r_xx / abs(r_xx).max()))
+        r_xx_dB = util.mag2db( r_xx )
+
+        if plot == True:
+            # Remove infinitesimally small components
+            plt.plot(r_xx_dB)
+            plt.title("ACF")
+            plt.ylabel("Normalized Magnitude [dB]")
+            plt.xlabel("Delay")
+            plt.show()
+        return r_xx_dB
 
     def getCoefficientsObjectiveFunction( self, c ):
         """
@@ -271,7 +297,6 @@ class chirp:
 
         # For symmetricsl PSD; cn = 0 for odd n > 2, that is, for n = 3, 5, 7, …
         # Nulling out these coefficients
-        
         if (self.target.symm == True) and (len(c) > 3):
             
             for i in range(3, len(c)):
@@ -279,98 +304,33 @@ class chirp:
                     c[i]=0
 
         self.c = c
-
         sig = self.generate()
-
-        """
-        plt.plot( self.target.f, self.target.magdB_f )
-        plt.plot( self.target.f, self.magdB(sig) )
-        plt.title("Frequency Response")
-        plt.ylabel("Normalized Magnitude [dB]")
-        plt.xlabel("Frequency [Hz]")
-        plt.show()
-        """
-        """
-        # The cost is the sum of MSE per frequency bin
-        errorVector = np.absolute(np.subtract(  self.target.magdB_f[self.target.index[0]:self.target.index[1]], self.magdB(sig)[self.target.index[0]:self.target.index[1]]))
-        #errorVectorFull = np.absolute(np.subtract(self.target.magdB_f, self.magdB(sig)))
-        # Square error
-        errorVector = np.power(errorVector, 1.5)
-        """
-        ACF(x, singleSided = True)
         
+        # The error vector is the difference in autocorrelation
+        errorVector = np.abs(np.subtract(self.target.r_xx_dB, self.ACFdB(sig)))
 
         cost = np.sum( errorVector )
         return cost
 
-    def getCoefficients( self, magdB_f, f, symm, order=6, fftLen = 2048):
+    def getCoefficients( self, r_xx_dB, symm, order=6):
         """
         Calculate the necessary coefficients in order to generate a NLFM chirp with a specific magnitude envelope (in frequency domain). Chirp generated using rftool.radar.generate().
         Coefficients are found through non-linear optimization.
 
-        PSD_f is the target spectral mask (vector) as a function of frequency [W/Hz].
-        f is the corresponding frequency vector [Hz].
+        r_xx_dB is the target aurocorrelation (vector).
         order is the oder of the polynomial used to generate the chirp frequency characteristics. the length of c is order+1.
         symm configures wether the intend PSD should be symmetrical. With a symmetrical target PSD, the result will be close to symmetrical even with symm set to false, 
         however the dimentionality of the problem is reduced greatly by setting symm to True.
         fftLen is the length of the FFT which will be used in comparison between the generated chirp spectral mask and the target mask.
         """
-        self.fftLen = fftLen
+        self.fftLen = len(r_xx_dB)
 
         # Initiate target chirp object 
-        target = self.target(magdB_f, f, order)
+        target = self.target(r_xx_dB, order)
+        self.target.r_xx_dB = r_xx_dB
         self.target.symm = symm
-        # Fs is the sampling frequency [Hz]. Fs must be at last twice the highest frequency in the input PSD. If Fs < 2*max(f), then Fs = 2*max(f)
-        if self.Fs < 2*np.amax(f):
-            self.Fs = 2*np.amax(f)
-
-        # Match the frequency separation between generated and target spectrums
-        targetFrequencySeparation = (f[-1]-f[1])/(len(f)-1)
-        signalFrequencySeperation = self.Fs/(self.fftLen-1)
-
-        # ensure that the frequency separation in the target magnitude series equals the fft of the signal.
-        if (targetFrequencySeparation != signalFrequencySeperation):
-            scale = targetFrequencySeparation/signalFrequencySeperation
-            length = np.intc(scale*len(f))
-
-            self.target.magdB_f = signal.resample(magdB_f, length)
-            self.target.f =  np.linspace(f[1], f[-1], length)
-
-        # Generate target vector of same format as self.magdB(sig) 
-        # sigLen = np.intc(self.Fs*self.t_i)
-        f = np.linspace(-self.Fs/2, (self.Fs/2), fftLen)
-        # Find position to place self.target.magdB_f in order to compare with self.magdB(sig)
-        closeness = np.absolute(np.subtract(f, self.target.f.min()))
-        index = closeness.argmin()
         
-        # Create target array of full length. Bins outside of the input frequency envelope
-        a = np.full((index-1), self.target.magdB_f[0])
-        bLen = (fftLen-(index-1)-len(self.target.magdB_f) )
-        # Index of where the inserted spectral mask is located in the fft mask.
-        if bLen < 1:
-            self.target.index = np.array([index, index+len(self.target.magdB_f[0:(bLen)])])
-            self.target.magdB_f = np.concatenate(( a, self.target.magdB_f[0:(bLen)] ))
-        else:
-            self.target.index = np.array([index, index+len(self.target.magdB_f)])
-            b = np.full((fftLen-(index-1)-len(self.target.magdB_f)), self.target.magdB_f[-1])
-            self.target.magdB_f = np.concatenate(( a, self.target.magdB_f, b ))
-
-        self.target.f =  np.linspace(-self.Fs/2, self.Fs/2, len(self.target.magdB_f))
-
         # optimization routine
-        """
-        Initial values:
-        For linear chirp then:
-        c[0] is the reference phase
-        c[1] is the reference frequency,
-        c[2] is the nominal constant chirp rate
-        """
-        
-        c0 = (np.random.rand( order+1 )-0.5)*2e3   # Initial values (random)
-        # Set reference frequency to the center frequency in the input magnitude spectral mask.
-        #c0[1] = self.target.f[self.target.magdB_f.argmax()]
-        c0[2] = self.target.f[self.target.magdB_f.argmax()]*50
-        """
         # Inital random search
         best_c = (np.random.rand( order+1 )-0.5)*2e3   # Initial values (random)
         lowestCost = 1e9
@@ -383,17 +343,15 @@ class chirp:
                 best_c = c
 
         c0 = best_c
-        """
+        
 
         res = optimize.minimize(self.getCoefficientsObjectiveFunction, c0, tol=1e-6, options={'maxiter': 10000, 'disp': True}) #  method='nelder-mead'
         # Optimized parameters
         # self.c=res.x
 
         # development stuff
-        plt.plot( self.target.f, self.target.magdB_f )
-        plt.plot( self.target.f, self.magdB(self.sig) )
-        plt.title("Frequency Response")
-        plt.ylabel("Normalized Magnitude [dB]")
-        plt.xlabel("Frequency [Hz]")
+        plt.plot( self.ACFdB(self.sig) )
+        plt.plot( self.target.r_xx_dB )
+        plt.title("Resulting ACF")
         plt.show()
         return self.c
