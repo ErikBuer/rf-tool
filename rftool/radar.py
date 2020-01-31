@@ -1,11 +1,13 @@
 import scipy.signal as signal
 import scipy.optimize as optimize
+import scipy.integrate as integrate
 import matplotlib.pyplot as plt
 import numpy as np
+import scipy.special as special
 from pyhht.visualization import plot_imfs   # Hilbert-Huang TF analysis
 from pyhht import EMD                       # Hilbert-Huang TF analysis
 import rftool.utility as util
-import timeit       # t&d
+
 
 def Albersheim( Pfa, Pd, N ):
     """
@@ -108,11 +110,9 @@ def hilbert_spectrum( sig, Fs=1 ):
     Based on:
     - S.E. Hamdi et al., Hilbert-Huang Transform versus Fourier based analysis for diffused ultrasonic waves structural health monitoring in polymer based composite materials,Proceedings of the Acoustics 2012 Nantes Conference.
     """
-
     # Hilbert-Huang
     decomposer = EMD(sig)
     imfs = decomposer.decompose()
-    #plot_imfs(sig, imfs, t)
 
     imfAngle = np.angle(signal.hilbert(imfs))
     dt = np.divide(1,Fs)
@@ -127,7 +127,6 @@ def hilbert_spectrum( sig, Fs=1 ):
 
     # Calculate Hilbert spectrum
     # Time, frequency, magnitude
-
     intensity = np.absolute(signal.hilbert(imfs))
     plt.figure()
     for i in range(np.size(instFreq,0)):
@@ -213,34 +212,76 @@ class chirp:
 
         - A .W. Doerry, Generating Nonlinear FM Chirp Waveforms for Radar, Sandia National Laboratories, 2006
         """
-        c = self.c
-        dt = np.divide(1,self.Fs)        # seconds
-        t = np.linspace(-self.t_i/2, self.t_i/2-dt, np.intc(self.Fs*self.t_i))  # Time vector
+        dt = 1/self.Fs        # seconds
+        self.t = np.linspace(-self.t_i/2, (self.t_i/2)-dt, np.intc(self.Fs*self.t_i))  # Time vector
+        #self.t = np.linspace(0, self.t_i-dt, np.intc(self.Fs*self.t_i))  # Time vector
 
-        phi_t = np.full(np.intc(self.t_i*self.Fs), c[-1])
+        phi_t = 0
+        for n in range(0, len(self.c)):
+            loopVar = self.c[n]/special.factorial(n)
+            phi_t = phi_t+np.power(self.t,n)*loopVar
+            """
+            if self.iterationCount % 10000 == 0:    # T&D
+                plt.plot(self.t, phi_t, label=n)
+            """
 
-        c = np.flip(c)
-        c = np.delete(c, 1) # delete c_N
-        for c_n in np.nditer(c):
-            phi_t = c_n + util.indefIntegration(phi_t, dt)
+        self.phi_t = phi_t
+        sig = np.exp(np.multiply(1j, phi_t))
 
-        gamma_t = np.gradient(phi_t,t)  # Instantaneous frequency
         """
-        plt.figure
-        plt.plot(t, gamma_t)
-        plt.xlabel('t [s]')
-        plt.ylabel('f [Hz]')
-        plt.title("Instantaneous Frequency")
-        plt.show()
+        if self.iterationCount % 10000 == 0:    # T&D
+            plt.legend()
+            plt.show()
+            self.getChirpRate()
+            hilbert_spectrum(np.real(sig),self.Fs)
         """
-        self.sig = np.exp(np.multiply(1j, phi_t))
-        return self.sig
+        return sig
+
+    def getInstFreq(self, analytical=True, plot=True):
+        if analytical == True:
+            # Calculate the instantaneous frequency based on polynoimial coefficients.
+            omega_t = 0
+            for n in range(1, len(self.c)):
+                loopVar = self.c[n]/special.factorial(n-1)
+                omega_t = omega_t+np.power(self.t,n-1)*loopVar
+        else:
+            # Calculate the instantaneous frequency based on phase vector.
+            omega_t = np.gradient(self.phi_t, self.t)
+
+        if plot == True:
+            plt.figure()
+            plt.plot(self.t[2:len(self.t)-2], omega_t[2:len(self.t)-2])
+            plt.xlabel('t [s]')
+            plt.ylabel('f [Hz]')
+            plt.title("Instantaneous Frequency")
+            plt.show()
+        return omega_t
+
+    def getChirpRate(self, analytical=True, plot=True):
+        if analytical == True:
+            # Calculate the chirp rate based on polynoimial coefficients.
+            gamma_t = 0
+            for n in range(2, len(self.c)):
+                loopVar = self.c[n]/special.factorial(n-2)
+                gamma_t = gamma_t+np.power(self.t,n-2)*loopVar
+        else:
+            # Calculate the chirp rate based on phase vector.
+            gamma_t = np.gradient(self.getInstFreq(plot=False), self.t)
+
+        if plot == True:
+            plt.figure()
+            plt.plot(self.t, gamma_t)
+            plt.xlabel('t [s]')
+            plt.ylabel('f [Hz]')
+            plt.title("Chirp Rate")
+            plt.show()
+        return gamma_t
 
     def plotMagnitude( self, sig_t ):
         sig_f = np.fft.fft(sig_t, self.fftLen)/self.fftLen
-        # Shift and normalize
+        # Shift and normalize.
         sig_f = np.abs(np.fft.fftshift(sig_f / abs(sig_f).max()))
-        # Remove infinitesimally small components
+        # Remove infinitesimally small components.
         sig_f = util.mag2db(np.maximum(sig_f, 1e-10))
         f = np.linspace(-self.Fs/2, self.Fs/2, len(sig_f))
         plt.figure()
@@ -255,9 +296,9 @@ class chirp:
         """
         Calculates Power Spectral Density in dBW/Hz.
         """
-        f, psd = signal.welch(sig_t, fs=self.Fs, nfft=self.fftLen, nperseg=self.fftLen, return_onesided=False)
+        f, psd = signal.welch(sig_t, fs=self.Fs, nfft=self.fftLen, nperseg=self.fftLen, window = signal.blackmanharris(self.fftLen),
+        noverlap = self.fftLen/4, return_onesided=False)
 
-        
         if plot == True:
             #f = np.linspace(-self.Fs/2, self.Fs/2, len(psd))
             # Remove infinitesimally small components
@@ -270,19 +311,30 @@ class chirp:
             plt.show()
         return psd
 
-    def ACFdB( self, sig_t, plot=False ):
+    def ACFdB( self, sig_t, plot=False, shift=False ):
         """
         Calculates normalized ACF in dB based on FFT downsampling.
         sig_t is the time-domain input signal.
+        plot specifies whether to plot the function.
+        Shift specifies whether to use convolution (True), or IFFT(PSD(sig)) (False)
         """
-        psd = self.PSD(sig_t)
-        r_xx = np.fft.ifft(psd, self.fftLen)
-        # Shift and normalize
-        r_xx = np.abs(np.fft.fftshift(r_xx / abs(r_xx).max()))
+        r_xx = np.array([1])
+        if shift == True:
+            print("Shift is true")
+            r_xx = signal.correlate(sig_t, sig_t)
+            r_xx = abs(r_xx)/abs(r_xx).max()
+
+        else:
+            psd = self.PSD(sig_t)
+            r_xx = np.fft.ifft(psd, self.fftLen)# ifft is scaled by 1/n
+            # Shift and normalize
+            r_xx = np.abs(np.fft.fftshift(r_xx))/abs(r_xx).max()
+        
         r_xx_dB = util.mag2db( r_xx )
 
         if plot == True:
             # Remove infinitesimally small components
+            plt.figure()
             plt.plot(r_xx_dB)
             plt.title("ACF")
             plt.ylabel("Normalized Magnitude [dB]")
@@ -309,16 +361,22 @@ class chirp:
         # The error vector is the difference in autocorrelation
         errorVector = np.abs(np.subtract(self.target.r_xx_dB, self.ACFdB(sig)))
 
+        #Keep count of optimization iterations
+        self.iterationCount = self.iterationCount+1
+        if self.iterationCount % 1000 == 0:
+            print("Optimization iteration:", self.iterationCount)
+            #self.getChirpRate() #T&D
+
         cost = np.sum( errorVector )
         return cost
 
-    def getCoefficients( self, r_xx_dB, symm, order=6):
+    def getCoefficients( self, r_xx_dB, symm, Omega=10e3, fCenter=20e3, order=8):
         """
         Calculate the necessary coefficients in order to generate a NLFM chirp with a specific magnitude envelope (in frequency domain). Chirp generated using rftool.radar.generate().
         Coefficients are found through non-linear optimization.
 
         r_xx_dB is the target aurocorrelation (vector).
-        order is the oder of the polynomial used to generate the chirp frequency characteristics. the length of c is order+1.
+        order is the oder of the phase polynomial used to generate the chirp frequency characteristics.
         symm configures wether the intend PSD should be symmetrical. With a symmetrical target PSD, the result will be close to symmetrical even with symm set to false, 
         however the dimentionality of the problem is reduced greatly by setting symm to True.
         fftLen is the length of the FFT which will be used in comparison between the generated chirp spectral mask and the target mask.
@@ -331,27 +389,40 @@ class chirp:
         self.target.symm = symm
         
         # optimization routine
-        # Inital random search
-        best_c = (np.random.rand( order+1 )-0.5)*2e3   # Initial values (random)
-        lowestCost = 1e9
-        for i in range(1, np.intc(10e3)):
-            c = (np.random.rand( order+1 )-0.5)*self.Fs   # Initial values (random)
-            cost = self.getCoefficientsObjectiveFunction(c)
-            if cost<lowestCost:
-                lowestCost = cost
-                print("Iteration ", i, "lowestCost = ", lowestCost)
-                best_c = c
-
-        c0 = best_c
+        # Count iterations
+        self.iterationCount = 0
+        """
+        Initial Values, for LFM:
+        c[0] is the reference phase
+        c[1] is the reference frequency
+        c[2] is the nominal constant chirp rate
+        """
+        c0 = np.zeros( order )
+        c0[1] = fCenter
+        c0[2] = Omega/self.t_i     # Initial chirp rate
         
-
-        res = optimize.minimize(self.getCoefficientsObjectiveFunction, c0, tol=1e-6, options={'maxiter': 10000, 'disp': True}) #  method='nelder-mead'
+        print("Initiating optimization routine")
+        #res = optimize.minimize(self.getCoefficientsObjectiveFunction, c0, method='nelder-mead', tol=1e-6, options={'maxiter': np.intc(1e6), 'disp': True}) #  method='nelder-mead'
         # Optimized parameters
         # self.c=res.x
 
+        minimizer_kwargs = {"method": "BFGS"}
+        ret = optimize.basinhopping(self.getCoefficientsObjectiveFunction, c0, stepsize=Omega/100, minimizer_kwargs=minimizer_kwargs, niter_success =1000)
+
+        self.sig = self.generate()
         # development stuff
-        plt.plot( self.ACFdB(self.sig) )
-        plt.plot( self.target.r_xx_dB )
+        self.getInstFreq()
+        self.getChirpRate()
+
+
+        dt = 1/self.Fs
+        t = np.linspace(-self.t_i, self.t_i -dt, self.fftLen)  # Time vector
+        plt.figure()
+        plt.plot( t, self.target.r_xx_dB )
+        ACF = self.ACFdB(self.sig, shift=True)
+        t2 = np.linspace(-self.t_i, self.t_i -dt, len(ACF))  # Time vector
+        plt.plot( t2, ACF )
+        plt.title("Resulting ACF")
         plt.title("Resulting ACF")
         plt.show()
         return self.c
