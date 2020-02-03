@@ -43,6 +43,14 @@ SNRdB = radar.Albersheim( Pfa, Pd, N )
 
 # Shnidman's equation for required SNR with incoherent integration, swerling 0-5
 SNRdB = radar.Shnidman( Pfa, Pd, N, SW )
+
+# Hillbert Spectrum Plot
+from scipy.signal import chirp
+import numpy as np
+Fs=np.intc(10e3)
+t = np.linspace(0, 1, Fs)
+w = chirp(t, f0=1e3, f1=2e3, t1=1, method='quadratic')
+radar.hilbert_spectrum(np.real(w), Fs)
 ```
 
 ### Digital Communications
