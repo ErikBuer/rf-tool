@@ -183,17 +183,16 @@ class chirp:
         Object for storing the properties of the target chirp. Used in optimization aproach for coefficients.
         """
 
-        def __init__( self,  r_xx_dB=1, f=1, order=6):
+        def __init__( self,  r_xx_dB=1, f=1, order=8):
             self.r_xx_dB = r_xx_dB
             self.f = f
             self.order = order
 
-    def __init__( self,  t_i=1, Fs=1 ):
+    def __init__( self, Fs=1 ):
         """
         t_i is the chirp duration [s].
         Fs is the intended sampling frequency [Hz]. Fs must be at last twice the highest frequency in the input PSD. If Fs < 2*max(f), then Fs = 2*max(f)
         """
-        self.t_i = t_i
         self.Fs = Fs
 
     def generate( self ):
@@ -213,28 +212,16 @@ class chirp:
         - A .W. Doerry, Generating Nonlinear FM Chirp Waveforms for Radar, Sandia National Laboratories, 2006
         """
         dt = 1/self.Fs        # seconds
-        self.t = np.linspace(-self.t_i/2, (self.t_i/2)-dt, np.intc(self.Fs*self.t_i))  # Time vector
-        #self.t = np.linspace(0, self.t_i-dt, np.intc(self.Fs*self.t_i))  # Time vector
+        self.t = np.linspace(-self.T/2, (self.T/2)-dt, np.intc(self.Fs*self.T))  # Time vector
+        #self.t = np.linspace(0, self.T-dt, np.intc(self.Fs*self.T))  # Time vector
 
         phi_t = 0
         for n in range(0, len(self.c)):
             loopVar = self.c[n]/special.factorial(n)
             phi_t = phi_t+np.power(self.t,n)*loopVar
-            """
-            if self.iterationCount % 10000 == 0:    # T&D
-                plt.plot(self.t, phi_t, label=n)
-            """
 
         self.phi_t = phi_t
         sig = np.exp(np.multiply(1j, phi_t))
-
-        """
-        if self.iterationCount % 10000 == 0:    # T&D
-            plt.legend()
-            plt.show()
-            self.getChirpRate()
-            hilbert_spectrum(np.real(sig),self.Fs)
-        """
         return sig
 
     def getInstFreq(self, analytical=True, plot=True):
@@ -346,16 +333,7 @@ class chirp:
         """
         Objective function for coefficient optimization
         """
-
-        # For symmetricsl PSD; cn = 0 for odd n > 2, that is, for n = 3, 5, 7, …
-        # Nulling out these coefficients
-        if (self.target.symm == True) and (len(c) > 3):
-            
-            for i in range(3, len(c)):
-                if (i % 2) == 1:
-                    c[i]=0
-
-        self.c = c
+        self.setCoefficients(c)
         sig = self.generate()
         
         # The error vector is the difference in autocorrelation
@@ -370,36 +348,142 @@ class chirp:
         cost = np.sum( errorVector )
         return cost
 
-    def getCoefficients( self, r_xx_dB, symm, Omega=10e3, fCenter=20e3, order=8):
+    def setCoefficients( self, c ):
+        # For symmetricsl PSD; cn = 0 for odd n > 2, that is, for n = 3, 5, 7, …
+        # Nulling out these coefficients
+        if (self.target.symm == True) and (len(c) > 3):
+            for i in range(3, len(c)):
+                if (i % 2) == 1:
+                    c[i]=0
+        self.c = c
+
+    def W( self, omega ):
+        """
+        Lookup table for the W function. Takes instantaneous frequency as input.
+        """
+        delta_omega_W = self.omega_W[1]-self.omega_W[0]
+        
+        W_omega = np.empty((len(omega)))
+        for i in range(0, len(omega)):
+            index = np.intc(omega[i]*delta_omega_W) +
+            if index<0:
+                index = 0
+            elif 511<index:
+                index = 511
+
+            W_omega[i] = self.window[index]
+
+        """
+        plt.plot(W_omega)
+        plt.title("W_omega")
+        plt.show()        
+        """
+        return W_omega
+
+    def gamma_t_objective( self, param ):
+        """
+        Objective function for finding gamma_t that meets the constraints.
+        param scales the gamma function.
+        """
+        # Calculate LFM chirp rate (initial gamma_t)
+        self.gamma_t = np.full(self.points, self.Omega/self.T)
+
+        #omega_t = integrate.cumtrapz(self.gamma_t, x =self.t ) # resulthas one less cell
+        omega_t = np.cumsum(self.gamma_t)*self.dt # Ghetto integral
+        # Place center frequency at omega_0
+        omega_t = omega_t + (self.omega_0 - omega_t[np.intc(len(omega_t)/2)])
+        # Scale to ensure omega is withing bounds +-abs(Omega/2)
+        omega_t = omega_t/( (np.max(omega_t)-self.omega_0)/(self.omega_0+self.Omega/2) )
+        plt.plot(omega_t)
+        plt.title("omega_t")
+        plt.show()
+        # Calculate new gamma_t
+        self.gamma_t = np.gradient(omega_t, self.t)
+        plt.plot(self.gamma_t)
+        plt.title("gamma_t")
+        plt.show()
+
+        # Calculate NLFM gamma function
+        self.gamma_t = self.gamma_t[np.intc(len(self.gamma_t)/2)]/self.W(omega_t-self.omega_0)
+        """
+        plt.plot(self.gamma_t)
+        plt.show()
+        """
+
+        OmegaIteration = np.trapz(self.gamma_t, dx=self.dt)
+        #frequencyConstraint = np.power(np.abs((self.Omega/2)-np.abs(np.max(omega_t)-self.omega_0)),2)
+        cost = np.abs(self.Omega - OmegaIteration)
+
+        self.iterationCount = self.iterationCount +1
+        print("Iteration",self.iterationCount)
+        return cost
+
+    def coefficient_objective( self, coefficients ):
+        """
+        Objective function for finding coefficients that meet the gamma_t Function.
+        
+        """
+        self.setCoefficients(coefficients)
+        gamma_t = self.getChirpRate(Plot = False)
+        omega_t = self.getInstFreq(plot = False)
+
+    def getCoefficients( self, window, symm, T=1e-3, targetBw=10e3, centerFreq=20e3, order=8, points=1025):
         """
         Calculate the necessary coefficients in order to generate a NLFM chirp with a specific magnitude envelope (in frequency domain). Chirp generated using rftool.radar.generate().
         Coefficients are found through non-linear optimization.
 
-        r_xx_dB is the target aurocorrelation (vector).
-        order is the oder of the phase polynomial used to generate the chirp frequency characteristics.
+        Window_ is the window function for the target PSD. It is used as a LUT based function from -Omega/2 to Omega/2, where Omega=targetBw.
         symm configures wether the intend PSD should be symmetrical. With a symmetrical target PSD, the result will be close to symmetrical even with symm set to false, 
         however the dimentionality of the problem is reduced greatly by setting symm to True.
-        fftLen is the length of the FFT which will be used in comparison between the generated chirp spectral mask and the target mask.
+        T is the pulse duration [s].
+        targetBw is the taget bandwidth of the chirp [Hz].
+        centerFreq is the center frequency of the chirp [Hz].
+        order is the oder of the phase polynomial used to generate the chirp frequency characteristics [integer].
+        pints is the number of points used t evaluate the chirp function. Not to be confused with the number of samples in the genrerated IF chirp.
         """
-        self.fftLen = len(r_xx_dB)
+        #self.fftLen = len(r_xx_dB) # Legacy
 
-        # Initiate target chirp object 
-        target = self.target(r_xx_dB, order)
-        self.target.r_xx_dB = r_xx_dB
+        self.Omega = targetBw
+        self.window = window
+        self.omega_W = np.linspace(-targetBw/2, targetBw/2, len(window))
+
+        self.omega_0 = centerFreq
+        self.T = T
+        self.points = points
+        #self.ponts = points
+        self.t = np.linspace(-self.T/2, self.T/2, points)
+        self.dt = self.T/(points-1)
         self.target.symm = symm
+
+        # optimization routine
+        # Count iterations
+        self.iterationCount = 0
+        # Initial scaling
+        p0=np.array([1])
+        # Optimize gamma_t curve with window
+        #bnds = ((0, 1))
+        #optimize.minimize(self.gamma_t_objective, p0, bounds=bnds, method='L-BFGS-B')
         
+        self.gamma_t_objective(p0)
+
+        plt.plot(self.t, self.gamma_t)
+        plt.title("gamma_t")
+        plt.show()
+
+
+
         # optimization routine
         # Count iterations
         self.iterationCount = 0
         """
         Initial Values, for LFM:
-        c[0] is the reference phase
+        c[0] is the reference phases
         c[1] is the reference frequency
         c[2] is the nominal constant chirp rate
         """
         c0 = np.zeros( order )
-        c0[1] = fCenter
-        c0[2] = Omega/self.t_i     # Initial chirp rate
+        c0[1] = self.omega_0
+        c0[2] = self.Omega/self.T     # Initial chirp rate
         
         print("Initiating optimization routine")
         #res = optimize.minimize(self.getCoefficientsObjectiveFunction, c0, method='nelder-mead', tol=1e-6, options={'maxiter': np.intc(1e6), 'disp': True}) #  method='nelder-mead'
@@ -407,7 +491,7 @@ class chirp:
         # self.c=res.x
 
         minimizer_kwargs = {"method": "BFGS"}
-        ret = optimize.basinhopping(self.getCoefficientsObjectiveFunction, c0, stepsize=Omega/100, minimizer_kwargs=minimizer_kwargs, niter_success =1000)
+        ret = optimize.basinhopping(self.getCoefficientsObjectiveFunction, c0, stepsize=self.Omega/100, minimizer_kwargs=minimizer_kwargs, niter_success =1000)
 
         self.sig = self.generate()
         # development stuff
@@ -416,11 +500,11 @@ class chirp:
 
 
         dt = 1/self.Fs
-        t = np.linspace(-self.t_i, self.t_i -dt, self.fftLen)  # Time vector
+        t = np.linspace(-self.T, self.T -dt, self.fftLen)  # Time vector
         plt.figure()
         plt.plot( t, self.target.r_xx_dB )
         ACF = self.ACFdB(self.sig, shift=True)
-        t2 = np.linspace(-self.t_i, self.t_i -dt, len(ACF))  # Time vector
+        t2 = np.linspace(-self.T, self.T -dt, len(ACF))  # Time vector
         plt.plot( t2, ACF )
         plt.title("Resulting ACF")
         plt.title("Resulting ACF")
