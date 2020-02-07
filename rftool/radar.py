@@ -209,13 +209,18 @@ class chirp:
         if 0 < np.max(errorVecotr):
             print("Warning, sample rate too low. Maximum phase change is", np.pi+np.max(errorVecotr), "Maximum allowed is pi." )
     
-    def genFromPoly( self ):
+    def genFromPoly( self, direction = None ):
         """
         Generate Non-Linear Frequency Modualted (NLFM) chirps based on a polynomial of arbitrary order.
+        direction controls the chirp direction. 'inverted' inverts the chirp direction.
         """
         dt = 1/self.Fs        # seconds
         polyOmega = np.poly1d(self.c)
+
         omega_t = polyOmega(self.t)
+        if direction == 'inverted':
+            omega_t = np.max(omega_t) - (omega_t-np.min(omega_t))
+
         phi_t = util.indefIntegration( omega_t, dt )
         sig = np.exp(np.multiply(1j*2*np.pi, phi_t))
         return sig
@@ -232,6 +237,7 @@ class chirp:
         return sig
 
     def getInstFreq(self, poly=True, plot=True):
+        # Calculate the instantaneous frequency as a function of time
         if poly == True:
             # Calculate the instantaneous frequency based on polynoimial coefficients.
             polyOmega = np.poly1d(self.c)
@@ -251,6 +257,7 @@ class chirp:
         return omega_t
 
     def getChirpRate(self, poly=True, plot=True):
+        # Calculate the chirp rate as a function of time
         if poly == True:
             # Calculate the chirp rate based on polynoimial coefficients.
             gamma_t = 0
@@ -368,6 +375,7 @@ class chirp:
         # Initial scaling
         p0=np.array([1])
         # Optimize gamma_t curve with window
+        print("Initiating chirp instantaneous frequency optimization.")
         chirpOpt = optimize.minimize(self.gamma_t_objective, p0, method='L-BFGS-B')
         
         # optimization routine
@@ -384,3 +392,28 @@ class chirp:
         self.c = np.polyfit(timeFit, omegaFit, order)
 
         return self.c
+
+
+    def modulate( self, bitstream=np.array([1,0,1,0])):
+        """
+        Modulate bit stream to a chirp. One chirp per bit. A 1 is represented as a forward time chirp.
+        A zero is represented as a time-reversed chirp.
+        
+        bitStream is the bitstream to be modulated (numpy array).
+        """
+        # Calculate length of signal
+        sigLen = len(bitstream)*self.points
+        # generate frame
+        waveform = np.empty([sigLen])
+
+        sig = self.genFromPoly()
+        sigInv = self.genFromPoly('inverted')
+
+        # Iterate through bitstream and add to waveform
+        for m, bit in enumerate(bitstream):
+            if bit:
+                waveform[m*self.points:(m+1)*self.points] = sig
+            else:
+                waveform[m*self.points:(m+1)*self.points] = sigInv
+
+        return waveform
