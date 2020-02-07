@@ -7,7 +7,6 @@ import scipy.special as special
 from pyhht.visualization import plot_imfs   # Hilbert-Huang TF analysis
 from pyhht import EMD                       # Hilbert-Huang TF analysis
 import rftool.utility as util
-import pywt # CWT
 
 
 def Albersheim( Pfa, Pd, N ):
@@ -193,18 +192,6 @@ class chirp:
     Object for generating linear and non-linear chirps.
     """
     c = np.array([1,1,1])
-    # FFT lenth for computation og magnitude spectrum.
-    fftLen = 2048
-
-    class target:
-        """
-        Object for storing the properties of the target chirp. Used in optimization aproach for coefficients.
-        """
-
-        def __init__( self,  r_xx_dB=1, f=1, order=8):
-            self.r_xx_dB = r_xx_dB
-            self.f = f
-            self.order = order
 
     def __init__( self, Fs=1 ):
         """
@@ -225,28 +212,15 @@ class chirp:
     def genFromPoly( self ):
         """
         Generate Non-Linear Frequency Modualted (NLFM) chirps based on a polynomial of arbitrary order.
-
-        t is the length of the chirp [s]
-        c is a vector of phase polynomial coefficients (arbitrary length)
-        Fs is the sampling frequency [Hz]
-
-        c[0] is the reference phase
-        c[1] is the reference frequency,
-        c[2] is the nominal constant chirp rate
-        
-        For symmetricsl PSD; c_n = 0 for odd n > 2, that is, for n = 3, 5, 7,…
-
-        - A .W. Doerry, Generating Nonlinear FM Chirp Waveforms for Radar, Sandia National Laboratories, 2006
         """
         dt = 1/self.Fs        # seconds
-        #self.t = np.linspace(-self.T/2, (self.T/2)-dt, np.intc(self.Fs*self.T))  # Time vector
-
-        omega_t = self.polyOmega(self.t)
+        polyOmega = np.poly1d(self.c)
+        omega_t = polyOmega(self.t)
         phi_t = util.indefIntegration( omega_t, dt )
         sig = np.exp(np.multiply(1j*2*np.pi, phi_t))
         return sig
 
-    def generate( self ):
+    def genNumerical( self ):
         """
         Generate Non.Linear Frequency Modualted (NLFM) chirps.
         - A .W. Doerry, Generating Nonlinear FM Chirp Waveforms for Radar, Sandia National Laboratories, 2006
@@ -257,14 +231,11 @@ class chirp:
         sig = np.exp(np.multiply(1j*2*np.pi, phi_t))
         return sig
 
-    def getInstFreq(self, analytical=True, plot=True):
-        if analytical == True:
+    def getInstFreq(self, poly=True, plot=True):
+        if poly == True:
             # Calculate the instantaneous frequency based on polynoimial coefficients.
-            omega_t = 0
-            for n in range(1, len(self.c)):
-                loopVar = self.c[n]/special.factorial(n-1)
-                omega_t = omega_t+np.power(self.t, n-1)*loopVar
-
+            polyOmega = np.poly1d(self.c)
+            omega_t = polyOmega(self.t)
         else:
             # Calculate the instantaneous frequency based on phase vector.
             omega_t = np.gradient(self.phi_t, self.t)
@@ -279,13 +250,14 @@ class chirp:
             plt.show()
         return omega_t
 
-    def getChirpRate(self, analytical=True, plot=True):
-        if analytical == True:
+    def getChirpRate(self, poly=True, plot=True):
+        if poly == True:
             # Calculate the chirp rate based on polynoimial coefficients.
             gamma_t = 0
             for n in range(2, len(self.c)):
-                loopVar = self.c[n]/special.factorial(n-2)
-                gamma_t = gamma_t+np.power(self.t,n-2)*loopVar
+                polyOmega = np.poly1d(self.c)
+                polyGamma = np.polyder(polyOmega)
+                omega_t = polyOmega(self.t)
         else:
             # Calculate the chirp rate based on phase vector.
             gamma_t = np.gradient(self.getInstFreq(plot=False), self.t)
@@ -298,21 +270,6 @@ class chirp:
             plt.title("Chirp Rate")
             plt.show()
         return gamma_t
-
-    def plotMagnitude( self, sig_t ):
-        sig_f = np.fft.fft(sig_t, self.fftLen)/self.fftLen
-        # Shift and normalize.
-        sig_f = np.abs(np.fft.fftshift(sig_f / abs(sig_f).max()))
-        # Remove infinitesimally small components.
-        sig_f = util.mag2db(np.maximum(sig_f, 1e-10))
-        f = np.linspace(-self.Fs/2, self.Fs/2, len(sig_f))
-        plt.figure()
-        plt.plot(f, sig_f)
-        plt.xlim([-self.Fs/2, self.Fs/2])
-        plt.title("Frequency response")
-        plt.ylabel("Normalized magnitude [dB]")
-        plt.xlabel("Frequency [Hz]")
-        plt.show()
 
     def PSD( self, sig_t, plot=False ):
         """
@@ -332,36 +289,6 @@ class chirp:
             plt.xlabel("Frequency [Hz]")
             plt.show()
         return psd
-
-    def ACFdB( self, sig_t, plot=False, shift=False ):
-        """
-        Calculates normalized ACF in dB based on FFT downsampling.
-        sig_t is the time-domain input signal.
-        plot specifies whether to plot the function.
-        Shift specifies whether to use convolution (True), or IFFT(PSD(sig)) (False)
-        """
-        r_xx = np.array([1])
-        if shift == True:
-            r_xx = signal.correlate(sig_t, sig_t)
-            r_xx = abs(r_xx)/abs(r_xx).max()
-
-        else:
-            psd = self.PSD(sig_t)
-            r_xx = np.fft.ifft(psd, self.fftLen)# ifft is scaled by 1/n
-            # Shift and normalize
-            r_xx = np.abs(np.fft.fftshift(r_xx))/abs(r_xx).max()
-        
-        r_xx_dB = util.mag2db( r_xx )
-
-        if plot == True:
-            # Remove infinitesimally small components
-            plt.figure()
-            plt.plot(r_xx_dB)
-            plt.title("ACF")
-            plt.ylabel("Normalized Magnitude [dB]")
-            plt.xlabel("Delay")
-            plt.show()
-        return r_xx_dB
 
     def W( self, omega ):
         """
@@ -389,7 +316,6 @@ class chirp:
         if self.iterationCount % 10 == 0:
             print("Iteration",self.iterationCount)
         
-
         # Calculate gamma_t for this iteration
         self.gamma_t = self.gamma_t_initial*scale
 
@@ -410,79 +336,27 @@ class chirp:
         cost = np.abs(self.Omega - OmegaIteration)
         return cost
 
-    def setCoefficients( self, c ):
-        # For symmetricsl PSD; cn = 0 for odd n > 2, that is, for n = 3, 5, 7, …
-        # Nulling out these coefficients
-        if (self.target.symm == True) and (len(c) > 3):
-            for i in range(3, len(c)):
-                if (i % 2) == 1:
-                    c[i]=0
-        self.c = c
-
-    def coefficient_objective( self, coefficients ):
-        """
-        Objective function for finding coefficients that meet the gamma_t Function.
-        """
-
-        self.setCoefficients(coefficients)
-        optOmega_t = self.getInstFreq(plot = False)
-        error = np.abs(self.targetOmega_t - optOmega_t)
-        cost = np.sum(np.power(error, 1))
-        
-        if (self.iterationCount % 1000) == 0:
-            plt.figure()
-            plt.plot(self.t, optOmega_t)
-            plt.show()
-                
-
-        self.iterationCount = self.iterationCount +1
-        print("Bashhopping iteration", self.iterationCount, "cost =", cost)
-        return cost
-
-    def omegaPoly(self, t, *coefficients):
-        """
-        Polynomilal for instantaneous frequency. It is one order lower than the phase polynomial.
-        """
-        self.iterationCount = self.iterationCount+1
-        print("Fit iteration", self.iterationCount)
-        result = sum([np.multiply(np.divide(c, special.factorial(n)), np.power(t, n)) for n, c in enumerate(coefficients)])  
-        return result
-
-    def getCoefficients( self, window, symm, T=1e-3, targetBw=10e3, centerFreq=20e3, order=48):
+    def getCoefficients( self, window, T=1e-3, targetBw=10e3, centerFreq=20e3, order=48):
         """
         Calculate the necessary coefficients in order to generate a NLFM chirp with a specific magnitude envelope (in frequency domain). Chirp generated using rftool.radar.generate().
         Coefficients are found through non-linear optimization.
 
         Window_ is the window function for the target PSD. It is used as a LUT based function from -Omega/2 to Omega/2, where Omega=targetBw.
-        symm configures wether the intend PSD should be symmetrical. With a symmetrical target PSD, the result will be close to symmetrical even with symm set to false, 
-        however the dimentionality of the problem is reduced greatly by setting symm to True.
         T is the pulse duration [s].
         targetBw is the taget bandwidth of the chirp [Hz].
         centerFreq is the center frequency of the chirp [Hz].
         order is the oder of the phase polynomial used to generate the chirp frequency characteristics [integer].
         pints is the number of points used t evaluate the chirp function. Not to be confused with the number of samples in the genrerated IF chirp.
         """
-        #self.fftLen = len(r_xx_dB) # Legacy
 
         self.Omega = targetBw
-        print("self.Omega", self.Omega)
-        #self.window = window
         self.window = np.maximum(window, 1e-8)
-
         
-        plt.figure()
-        plt.plot(self.window)
-        plt.title("Target Window")
-        plt.show()
-        
-
         self.omega_0 = centerFreq
         self.T = T
         self.points = np.intc(self.Fs*T)
-        #self.ponts = points
         self.t = np.linspace(-self.T/2, self.T/2, self.points)
         self.dt = self.T/(self.points-1)
-        self.target.symm = symm
 
         # optimization routine
         # Count iterations
@@ -496,49 +370,18 @@ class chirp:
         # Optimize gamma_t curve with window
         chirpOpt = optimize.minimize(self.gamma_t_objective, p0, method='L-BFGS-B')
         
-        plt.figure()
-        plt.plot(self.t, self.gamma_t)
-        plt.title("gamma_t")
-        plt.figure()
-        plt.plot(self.t, self.targetOmega_t)
-        plt.title("targetOmega_t")
-        plt.show()
-
-        
         # optimization routine
         # Count iterations
         self.iterationCount = 0
         
-        """
-        Initial Values, for LFM:
-        c[0] is the reference frequency
-        c[1] is the nominal constant chirp rate
-        """
         # Order and initial conditions
         c0 = np.zeros( order )
-        c0[0] = self.omega_0
-        c0[1] = self.Omega/self.T     # Initial chirp rate
         
-
         # Resample time series to improve the fitting result.
         omegaFit = signal.decimate(self.targetOmega_t, 16, ftype='iir', zero_phase=True)
         timeFit = np.linspace(-self.T/2, self.T/2, len(omegaFit))
 
         print("Initiating optimization routine")
-        #coefficients, cov = optimize.curve_fit(self.omegaPoly, timeFit, omegaFit, p0=c0, method='trf')
-        coefficients = np.polyfit(timeFit, omegaFit, order)
-        self.polyOmega = np.poly1d(coefficients)
-        print("coefficients", coefficients)
-        #coefOpt = optimize.minimize(self.coefficient_objective, x0=c0)
+        self.c = np.polyfit(timeFit, omegaFit, order)
 
-        #coefOpt = optimize.basinhopping(self.coefficient_objective, x0=c0, stepsize=100e3)
-        #print("coefficients", self.c)
-
-        plt.plot(self.t, self.polyOmega(self.t))
-        plt.plot(self.t, self.targetOmega_t)
-        plt.title("Polynomial curve")
-        plt.show()
-        
-        self.sig = self.genFromPoly()
-        #self.CWT(plot = True)
         return self.c
