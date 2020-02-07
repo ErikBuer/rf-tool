@@ -100,7 +100,7 @@ def upconvert( sig, f_c, Fs=1 ):
     sig = np.multiply(sig, np.exp(1j*phi_j))
     return sig
 
-def hilbert_spectrum( sig, Fs=1 ):
+def hilbert_spectrum( sig, Fs=1, *args, **kwargs):
     """
     Hilbert-Huang transform with Hilbert spectral plot.
     The plot neglects negative frequencies.
@@ -111,6 +111,8 @@ def hilbert_spectrum( sig, Fs=1 ):
     Based on:
     - S.E. Hamdi et al., Hilbert-Huang Transform versus Fourier based analysis for diffused ultrasonic waves structural health monitoring in polymer based composite materials,Proceedings of the Acoustics 2012 Nantes Conference.
     """
+    plotLabel = kwargs.get('label', None)
+
     # Hilbert-Huang
     decomposer = EMD(sig)
     imfs = decomposer.decompose()
@@ -132,6 +134,7 @@ def hilbert_spectrum( sig, Fs=1 ):
     plt.figure()
     for i in range(np.size(instFreq,0)):
         plt.scatter(t, instFreq[i], c=intensity[i], s=5, alpha=0.3)
+    plt.legend(plotLabel)
 
     plt.title("Hilbert Spectrum")
     plt.xlabel('t [s]')
@@ -140,14 +143,17 @@ def hilbert_spectrum( sig, Fs=1 ):
     plt.xlim(t[1], t[-1])
     plt.tight_layout()
 
-def ACF(x, plot = True):
+def ACF(x, plot = True, *args, **kwargs):
     """
     Normalized autocorrelation Function of input x.
     x is the signal being analyzed. If x is a matrix, the correlation is performed columnwise.
     plot decides wether to plot the result.
+    label is the plot label for each vector. ['label1', 'label1']
 
     The output is 2*len(x)-1 long. If the input is a matrix, the output is a matrix.
     """
+    plotLabel = kwargs.get('label', None)
+
     # If x is a vector, ensure it is a column vector.
     if x.ndim < 1:
         x = np.expand_dims(x, axis=1)
@@ -161,12 +167,13 @@ def ACF(x, plot = True):
         # Plot
         plt.figure()
         
-        for column in r_xx.T:
+        for i, column in enumerate(r_xx.T):
             # Normalize
             column = np.absolute(column / abs(column).max())
-            plt.plot(util.mag2db(column))
+            plt.plot(util.mag2db(column), label=plotLabel[i])
 
         yMin = np.maximum(-100, np.min(r_xx))
+        plt.legend()
         plt.ylim([yMin, 0])
         plt.title("Autocorrelation Function")
         plt.ylabel("Normalized magnitude [dB]")
@@ -215,9 +222,9 @@ class chirp:
         if 0 < np.max(errorVecotr):
             print("Warning, sample rate too low. Maximum phase change is", np.pi+np.max(errorVecotr), "Maximum allowed is pi." )
     
-    def generate( self ):
+    def genFromPoly( self ):
         """
-        Generate Non.Linear Frequency Modualted (NLFM) chirps based on a polynomial of arbitrary order.
+        Generate Non-Linear Frequency Modualted (NLFM) chirps based on a polynomial of arbitrary order.
 
         t is the length of the chirp [s]
         c is a vector of phase polynomial coefficients (arbitrary length)
@@ -234,16 +241,18 @@ class chirp:
         dt = 1/self.Fs        # seconds
         #self.t = np.linspace(-self.T/2, (self.T/2)-dt, np.intc(self.Fs*self.T))  # Time vector
 
+        omega_t = self.polyOmega(self.t)
+        phi_t = util.indefIntegration( omega_t, dt )
+        sig = np.exp(np.multiply(1j*2*np.pi, phi_t))
+        return sig
+
+    def generate( self ):
         """
-        phi_t = 0
-        for n in range(0, len(self.c)):
-            loopVar = self.c[n]/special.factorial(n)
-            phi_t = phi_t+np.power(self.t, n)*loopVar
+        Generate Non.Linear Frequency Modualted (NLFM) chirps.
+        - A .W. Doerry, Generating Nonlinear FM Chirp Waveforms for Radar, Sandia National Laboratories, 2006
+        """
+        dt = 1/self.Fs        # seconds
 
-        self.phi_t = phi_t"""
-        #stretchedOmega_t = signal.resample(self.targetOmega_t, len(self.t))
-
-        
         phi_t = util.indefIntegration( self.targetOmega_t, dt )
         sig = np.exp(np.multiply(1j*2*np.pi, phi_t))
         return sig
@@ -304,18 +313,6 @@ class chirp:
         plt.ylabel("Normalized magnitude [dB]")
         plt.xlabel("Frequency [Hz]")
         plt.show()
-
-    def CWT( self, plot=False ):
-        """
-        Calculates Continious Wavelet Transform.
-        """
-        print("Calculating CWT")
-        coef, freqs=pywt.cwt(self.sig, np.arange(self.Fs/4,self.Fs/2, 64),'cmor1.5-1.0')
-        
-        if plot == True:
-            plt.matshow(coef)
-            plt.show()
-        return coef
 
     def PSD( self, sig_t, plot=False ):
         """
@@ -430,19 +427,28 @@ class chirp:
         self.setCoefficients(coefficients)
         optOmega_t = self.getInstFreq(plot = False)
         error = np.abs(self.targetOmega_t - optOmega_t)
-        cost = np.sum(np.power(error, 2))
-        """
+        cost = np.sum(np.power(error, 1))
+        
         if (self.iterationCount % 1000) == 0:
             plt.figure()
             plt.plot(self.t, optOmega_t)
             plt.show()
-        """
+                
 
         self.iterationCount = self.iterationCount +1
-        print("Iteration",self.iterationCount, "cost =", cost)
+        print("Bashhopping iteration", self.iterationCount, "cost =", cost)
         return cost
-        
-    def getCoefficients( self, window, symm, T=1e-3, targetBw=10e3, centerFreq=20e3, order=8):
+
+    def omegaPoly(self, t, *coefficients):
+        """
+        Polynomilal for instantaneous frequency. It is one order lower than the phase polynomial.
+        """
+        self.iterationCount = self.iterationCount+1
+        print("Fit iteration", self.iterationCount)
+        result = sum([np.multiply(np.divide(c, special.factorial(n)), np.power(t, n)) for n, c in enumerate(coefficients)])  
+        return result
+
+    def getCoefficients( self, window, symm, T=1e-3, targetBw=10e3, centerFreq=20e3, order=48):
         """
         Calculate the necessary coefficients in order to generate a NLFM chirp with a specific magnitude envelope (in frequency domain). Chirp generated using rftool.radar.generate().
         Coefficients are found through non-linear optimization.
@@ -460,7 +466,7 @@ class chirp:
 
         self.Omega = targetBw
         print("self.Omega", self.Omega)
-        self.window = window
+        #self.window = window
         self.window = np.maximum(window, 1e-8)
 
         
@@ -498,34 +504,41 @@ class chirp:
         plt.title("targetOmega_t")
         plt.show()
 
-        """
+        
         # optimization routine
         # Count iterations
         self.iterationCount = 0
         
+        """
         Initial Values, for LFM:
-        c[0] is the reference phases
-        c[1] is the reference frequency
-        c[2] is the nominal constant chirp rate
-        
+        c[0] is the reference frequency
+        c[1] is the nominal constant chirp rate
+        """
+        # Order and initial conditions
         c0 = np.zeros( order )
-        c0[1] = self.omega_0
-        c0[2] = self.Omega/self.T     # Initial chirp rate
+        c0[0] = self.omega_0
+        c0[1] = self.Omega/self.T     # Initial chirp rate
         
-        print("Initiating optimization routine")
-        minimizer_kwargs = {"method": "BFGS"}
-        #coefOpt = optimize.basinhopping(self.coefficient_objective, c0, niter=1000, minimizer_kwargs=minimizer_kwargs, niter_success =100)
-        
-        bounds = [(-1e6, 1e6), (-1e6, 1e6), (-1e6, 1e6), (-1e6, 1e6), (-1e6, 1e6), (-1e6, 1e6), (-1e6, 1e6), (-1e6, 1e6)]
-        optimize.differential_evolution(self.coefficient_objective, bounds, popsize = np.intc(1e3))
-    
 
+        # Resample time series to improve the fitting result.
+        omegaFit = signal.decimate(self.targetOmega_t, 16, ftype='iir', zero_phase=True)
+        timeFit = np.linspace(-self.T/2, self.T/2, len(omegaFit))
+
+        print("Initiating optimization routine")
+        #coefficients, cov = optimize.curve_fit(self.omegaPoly, timeFit, omegaFit, p0=c0, method='trf')
+        coefficients = np.polyfit(timeFit, omegaFit, order)
+        self.polyOmega = np.poly1d(coefficients)
+        print("coefficients", coefficients)
         #coefOpt = optimize.minimize(self.coefficient_objective, x0=c0)
 
-        # development stuff
-        self.getChirpRate()
-        self.getInstFreq()
-        """
-        self.sig = self.generate()
+        #coefOpt = optimize.basinhopping(self.coefficient_objective, x0=c0, stepsize=100e3)
+        #print("coefficients", self.c)
+
+        plt.plot(self.t, self.polyOmega(self.t))
+        plt.plot(self.t, self.targetOmega_t)
+        plt.title("Polynomial curve")
+        plt.show()
+        
+        self.sig = self.genFromPoly()
         #self.CWT(plot = True)
         return self.c
