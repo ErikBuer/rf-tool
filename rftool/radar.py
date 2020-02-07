@@ -381,7 +381,6 @@ class chirp:
         omegaFit = signal.decimate(self.targetOmega_t, 16, ftype='iir', zero_phase=True)
         timeFit = np.linspace(-self.T/2, self.T/2, len(omegaFit))
 
-        print("Initiating optimization routine")
         self.c = np.polyfit(timeFit, omegaFit, order)
 
         return self.c
