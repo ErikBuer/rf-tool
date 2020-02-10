@@ -1,9 +1,13 @@
 import scipy.signal as signal
 import scipy.optimize as optimize
 import scipy.integrate as integrate
-import matplotlib.pyplot as plt
-import numpy as np
 import scipy.special as special
+import numpy as np
+
+from mpl_toolkits.mplot3d import axes3d     # 3D plot
+import matplotlib.pyplot as plt
+from matplotlib import cm
+
 from pyhht.visualization import plot_imfs   # Hilbert-Huang TF analysis
 from pyhht import EMD                       # Hilbert-Huang TF analysis
 import rftool.utility as util
@@ -108,7 +112,7 @@ def hilbert_spectrum( sig, Fs=1, *args, **kwargs):
     Fs is the sample frequency
 
     Based on:
-    - S.E. Hamdi et al., Hilbert-Huang Transform versus Fourier based analysis for diffused ultrasonic waves structural health monitoring in polymer based composite materials,Proceedings of the Acoustics 2012 Nantes Conference.
+    - S.E. Hamdi et al., Hilbert-Huang Transform versus Fourier based analysis for diffused ultrasonic waves structural health monitoring in polymer based composite materials, Proceedings of the Acoustics 2012 Nantes Conference.
     """
     plotLabel = kwargs.get('label', None)
 
@@ -132,7 +136,7 @@ def hilbert_spectrum( sig, Fs=1, *args, **kwargs):
     intensity = np.absolute(signal.hilbert(imfs))
     plt.figure()
     for i in range(np.size(instFreq,0)):
-        plt.scatter(t, instFreq[i], c=intensity[i], s=5, alpha=0.3)
+        plt.scatter(t, instFreq[i], c=intensity[i], s=5, alpha=0.3, cmap=cm.coolwarm)
     plt.legend(plotLabel)
 
     plt.title("Hilbert Spectrum")
@@ -179,7 +183,104 @@ def ACF(x, plot = True, *args, **kwargs):
         plt.tight_layout()
     return r_xx
 
-# TODO def AF(x, Fs=1, doppler = 2)
+
+def FAM(x, Fs=1, plot=True):
+    """
+    Estimate the discrete time Spectral Correlation Density (SCD) using the Time-Smoothing FFT Accumulation Method.
+    - Roberts et. al, Computationally Efficient Algorithms for Cyclic Spectral Analysis, IEEE SP Magazine, 1991
+    - C Spooner, CSP Estimators: The FFT Accumulation Method, https://cyclostationary.blog/2018/06/01/csp-estimators-the-fft-accumulation-method/, 2018
+    """
+    # TODO: Add support for both x(t) and y(t)
+    # L << N
+    b = 8
+    N = np.intc(2**b)
+    L = np.intc(N/64)
+    N_Prime = np.intc(L*8)
+    P = np.intc(N/L)
+
+    print("len(x)<P*L+N =", len(x)<P*L+N)
+    # Scale estimator to input signal
+    while (P*L+N<len(x)):
+        b += 1
+        N = np.intc(2**b)
+        L = np.intc(N/64)
+        N_Prime = np.intc(L*8)
+        P = np.intc(N/L)
+
+    # Ensure input is complex
+    x = x.astype(complex)
+
+    # Zero padd signal in order fo fill N*P matrix
+    if len(x)<(P-1)*L+N_Prime-len(x):
+        x = np.pad(x, (0, (P-1)*L+N_Prime), 'constant', constant_values=(0, 0))
+
+    print("(P*L)+N", (P*L)+N)
+    print("len(x)", len(x))
+    print("N", N)
+    print("N_Prime", N_Prime)
+    print("L", L)
+    print("P", P)
+
+    # Assemble data matrix from input sequence
+    xMat = np.zeros((N_Prime, P), dtype=complex)
+    print("xMat.shape", xMat.shape)
+
+
+    for p in range(np.size(xMat, 1)):
+        xMat[:,p] = x[p*L:(p*L)+N_Prime]
+
+    # Apply window of len N to the data columnwise
+    window = signal.hamming(N_Prime)
+
+    for p in range(np.size(xMat, 1)):
+        #for column in xMatRRW.T:
+            # Window column
+            xMat[:,p] = np.multiply(xMat[:,p], window)
+            # N-point FFT
+            xMat[:,p] = np.fft.fft(xMat[:,p])
+            # Correct phase
+            nVec = np.array(range(1, N_Prime+1))
+            print("len(nVec)", len(nVec))
+            print("len(xMat[:,p])", len(xMat[:,p]))
+            xMat[:,p] = np.multiply(xMat[:,p],np.exp(np.multiply(-1j*2*np.pi*(p+1),nVec)/N_Prime))  # TODO, add alpha term
+
+    # Mix Channelized Subblocks (Self mix)
+    SCD = np.empty_like(xMat, dtype=complex)
+
+    for j in range(np.size(SCD, 0)):
+        SCD[j,:] = np.multiply(xMat[j,:], np.conjugate(xMat[j,:]))
+        # P-point FFT
+        SCD[j,:] = np.fft.fft(SCD[j,:])
+
+    # Plot SCD
+    if plot == True:
+        plt.figure()
+        plt.imshow(np.abs(SCD), cmap=cm.coolwarm)
+        plt.colorbar()
+
+        fig = plt.figure()
+        ax = fig.gca(projection='3d')
+        Y = np.ones_like(SCD, dtype=complex) #np.linspace(-0.5, 0.5, np.size(xMat, 0))
+        X = np.ones_like(SCD, dtype=complex) #np.linspace(-1, 1, np.size(xMat, 1))
+        Z = np.abs(SCD)
+        ax.plot_surface(X, Y, Z) # , rstride=8, cstride=8, alpha=0.3
+        cset = ax.contour(X, Y, Z, zdir='z', cmap=cm.coolwarm)
+        cset = ax.contour(X, Y, Z, zdir='x', cmap=cm.coolwarm)
+        cset = ax.contour(X, Y, Z, zdir='y', cmap=cm.coolwarm)
+        
+        ax.set_xlabel('X')
+        #ax.set_xlim(-40, 40)
+        ax.set_ylabel('Y')
+        #ax.set_ylim(-40, 40)
+        ax.set_zlabel('Z')
+        #ax.set_zlim(-100, 100)
+
+        plt.title("Spectral Correlation Density")
+        plt.show()
+
+    return SCD
+
+# TODO def AF(x, Fs=1, doppler = 2):
     """
     Ambuigity Function
     x is the signal being analyzed.
@@ -191,7 +292,6 @@ class chirp:
     """
     Object for generating linear and non-linear chirps.
     """
-    c = np.array([1,1,1])
 
     def __init__( self, Fs=1 ):
         """
