@@ -136,8 +136,9 @@ def hilbert_spectrum( sig, Fs=1, *args, **kwargs):
     intensity = np.absolute(signal.hilbert(imfs))
     plt.figure()
     for i in range(np.size(instFreq,0)):
-        plt.scatter(t, instFreq[i], c=intensity[i], s=5, alpha=0.3, cmap=cm.coolwarm)
+        plt.scatter(t, instFreq[i], c=intensity[i], s=5, alpha=0.3, cmap=cm.plasma)
     plt.legend(plotLabel)
+    plt.colorbar()
 
     plt.title("Hilbert Spectrum")
     plt.xlabel('t [s]')
@@ -183,28 +184,31 @@ def ACF(x, plot = True, *args, **kwargs):
         plt.tight_layout()
     return r_xx
 
-
-def FAM(x, Fs=1, plot=True):
+def FAM(x, *args, **kwargs):
     """
     Estimate the discrete time Spectral Correlation Density (SCD) using the Time-Smoothing FFT Accumulation Method.
     - Roberts et. al, Computationally Efficient Algorithms for Cyclic Spectral Analysis, IEEE SP Magazine, 1991
     - C Spooner, CSP Estimators: The FFT Accumulation Method, https://cyclostationary.blog/2018/06/01/csp-estimators-the-fft-accumulation-method/, 2018
     """
+    plot = kwargs.get('plot', False)
+    scale = kwargs.get('scale', 'linear') # 'linear', 'log', 'dB'
+    Fs = kwargs.get('Fs', 1)
+    method = kwargs.get('method', 'non-conj') # 'non-conj' or conj
+
     # TODO: Add support for both x(t) and y(t)
     # L << N
     b = 8
     N = np.intc(2**b)
-    L = np.intc(N/64)
-    N_Prime = np.intc(L*8)
+    L = np.intc(N/512)
+    N_Prime = np.intc(L*1.8)
     P = np.intc(N/L)
 
-    print("len(x)<P*L+N =", len(x)<P*L+N)
     # Scale estimator to input signal
     while (P*L+N<len(x)):
         b += 1
         N = np.intc(2**b)
-        L = np.intc(N/64)
-        N_Prime = np.intc(L*8)
+        L = np.intc(N/512)
+        N_Prime = np.intc(L*1.8)
         P = np.intc(N/L)
 
     # Ensure input is complex
@@ -214,16 +218,9 @@ def FAM(x, Fs=1, plot=True):
     if len(x)<(P-1)*L+N_Prime-len(x):
         x = np.pad(x, (0, (P-1)*L+N_Prime), 'constant', constant_values=(0, 0))
 
-    print("(P*L)+N", (P*L)+N)
-    print("len(x)", len(x))
-    print("N", N)
-    print("N_Prime", N_Prime)
-    print("L", L)
-    print("P", P)
-
     # Assemble data matrix from input sequence
     xMat = np.zeros((N_Prime, P), dtype=complex)
-    print("xMat.shape", xMat.shape)
+
 
 
     for p in range(np.size(xMat, 1)):
@@ -240,45 +237,61 @@ def FAM(x, Fs=1, plot=True):
             xMat[:,p] = np.fft.fft(xMat[:,p])
             # Correct phase
             nVec = np.array(range(1, N_Prime+1))
-            print("len(nVec)", len(nVec))
-            print("len(xMat[:,p])", len(xMat[:,p]))
             xMat[:,p] = np.multiply(xMat[:,p],np.exp(np.multiply(-1j*2*np.pi*(p+1),nVec)/N_Prime))  # TODO, add alpha term
 
     # Mix Channelized Subblocks (Self mix)
     SCD = np.empty_like(xMat, dtype=complex)
 
     for j in range(np.size(SCD, 0)):
-        SCD[j,:] = np.multiply(xMat[j,:], np.conjugate(xMat[j,:]))
+        if method == 'conj':
+            SCD[j,:] = np.multiply(xMat[j,:], np.conjugate(xMat[j,:]))
+        elif method == 'non-conj':
+            SCD[j,:] = np.multiply(xMat[j,:], xMat[j,:])
         # P-point FFT
         SCD[j,:] = np.fft.fft(SCD[j,:])
 
+    # Shift data (zero hertz at the center of each axis)
+    SCD = np.fft.fftshift(SCD)
+    
+    # Calculate axis
+    k = np.linspace(-N_Prime/2, N_Prime/2-1, N_Prime)
+    f_j = k*(Fs/N_Prime)    # Frequency axis
+    
+    deltaAlpha = Fs/N
+    alpha_i = np.linspace(-np.size(SCD, 0)/2, np.size(SCD, 0)/2-1, np.size(SCD, 1))*deltaAlpha
+    # Discart Information outside of the domain (Region of support?)
+
     # Plot SCD
     if plot == True:
+        # Scale output
+        if scale=='dB':
+            SCD = util.mag2db(np.abs(SCD))
+        elif scale=='log':
+            SCD = np.log(np.abs(SCD))
+        else:
+            SCD = np.abs(SCD)
+
         plt.figure()
-        plt.imshow(np.abs(SCD), cmap=cm.coolwarm)
+        plt.imshow(SCD, cmap=cm.plasma)
+        plt.title("Spectral Correlation Density")
+        plt.xlabel("alpha [Hz]")
+        plt.ylabel("f [Hz]")
         plt.colorbar()
 
+        
         fig = plt.figure()
         ax = fig.gca(projection='3d')
-        Y = np.ones_like(SCD, dtype=complex) #np.linspace(-0.5, 0.5, np.size(xMat, 0))
-        X = np.ones_like(SCD, dtype=complex) #np.linspace(-1, 1, np.size(xMat, 1))
-        Z = np.abs(SCD)
-        ax.plot_surface(X, Y, Z) # , rstride=8, cstride=8, alpha=0.3
-        cset = ax.contour(X, Y, Z, zdir='z', cmap=cm.coolwarm)
-        cset = ax.contour(X, Y, Z, zdir='x', cmap=cm.coolwarm)
-        cset = ax.contour(X, Y, Z, zdir='y', cmap=cm.coolwarm)
+        Alpha_i, F_j = np.meshgrid(alpha_i, f_j)
+
+        surf = ax.plot_surface(Alpha_i, F_j, SCD, cmap=cm.plasma, linewidth=0, antialiased=False)
         
-        ax.set_xlabel('X')
-        #ax.set_xlim(-40, 40)
-        ax.set_ylabel('Y')
-        #ax.set_ylim(-40, 40)
-        ax.set_zlabel('Z')
-        #ax.set_zlim(-100, 100)
-
+        # Add a color bar which maps values to colors.
+        fig.colorbar(surf) #, shrink=0.5, aspect=5)
         plt.title("Spectral Correlation Density")
-        plt.show()
+        plt.xlabel("alpha [Hz]")
+        plt.ylabel("f [Hz]")
 
-    return SCD
+    return SCD, f_j, alpha_i
 
 # TODO def AF(x, Fs=1, doppler = 2):
     """
@@ -504,7 +517,7 @@ class chirp:
         # Calculate length of signal
         sigLen = len(bitstream)*self.points
         # generate frame
-        waveform = np.empty([sigLen])
+        waveform = np.empty([sigLen], dtype=complex)
 
         sig = self.genFromPoly()
         sigInv = self.genFromPoly('inverted')
