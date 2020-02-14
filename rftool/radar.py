@@ -136,7 +136,7 @@ def hilbert_spectrum( sig, Fs=1, *args, **kwargs):
     intensity = np.absolute(signal.hilbert(imfs))
     plt.figure()
     for i in range(np.size(instFreq,0)):
-        plt.scatter(t, instFreq[i], c=intensity[i], s=5, alpha=0.3, cmap=cm.plasma)
+        plt.scatter(t, instFreq[i], c=intensity[i], s=5, alpha=0.3, cmap=cm.coolwarm)
     plt.legend(plotLabel)
     plt.colorbar()
 
@@ -221,8 +221,6 @@ def FAM(x, *args, **kwargs):
     # Assemble data matrix from input sequence
     xMat = np.zeros((N_Prime, P), dtype=complex)
 
-
-
     for p in range(np.size(xMat, 1)):
         xMat[:,p] = x[p*L:(p*L)+N_Prime]
 
@@ -272,7 +270,7 @@ def FAM(x, *args, **kwargs):
             SCD = np.abs(SCD)
 
         plt.figure()
-        plt.imshow(SCD, cmap=cm.plasma)
+        plt.imshow(SCD, cmap=cm.coolwarm)
         plt.title("Spectral Correlation Density")
         plt.xlabel("alpha [Hz]")
         plt.ylabel("f [Hz]")
@@ -283,7 +281,7 @@ def FAM(x, *args, **kwargs):
         ax = fig.gca(projection='3d')
         Alpha_i, F_j = np.meshgrid(alpha_i, f_j)
 
-        surf = ax.plot_surface(Alpha_i, F_j, SCD, cmap=cm.plasma, linewidth=0, antialiased=False)
+        surf = ax.plot_surface(Alpha_i, F_j, SCD, cmap=cm.coolwarm, linewidth=0, antialiased=False)
         
         # Add a color bar which maps values to colors.
         fig.colorbar(surf) #, shrink=0.5, aspect=5)
