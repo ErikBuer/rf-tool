@@ -134,7 +134,7 @@ def hilbert_spectrum( sig, Fs=1, *args, **kwargs):
     # Calculate Hilbert spectrum
     # Time, frequency, magnitude
     intensity = np.absolute(signal.hilbert(imfs))
-    plt.figure()
+    plt.figure(figsize=(10, 3))
     for i in range(np.size(instFreq,0)):
         plt.scatter(t, instFreq[i], c=intensity[i], s=5, alpha=0.3, cmap=cm.coolwarm)
     plt.legend(plotLabel)
@@ -159,17 +159,17 @@ def ACF(x, plot = True, *args, **kwargs):
     plotLabel = kwargs.get('label', None)
 
     # If x is a vector, ensure it is a column vector.
-    if x.ndim < 1:
+    if x.ndim < 2:
         x = np.expand_dims(x, axis=1)
 
     # Iterate through columns
-    r_xx = np.empty( shape=[2*np.size(x,0)-1, np.size(x,1)] )
+    r_xx = np.empty( shape=[2*np.size(x,0)-1, np.size(x,1)], dtype=complex )
     for n in range(0, np.size(x,1)):
         r_xx[:,n] = np.correlate(x[:,n], x[:,n], mode='full')
         
     if plot == True:
         # Plot
-        plt.figure()
+        plt.figure(figsize=(10, 3))
         
         for i, column in enumerate(r_xx.T):
             # Normalize
@@ -256,8 +256,8 @@ def FAM(x, *args, **kwargs):
     f_j = k*(Fs/N_Prime)    # Frequency axis
     
     deltaAlpha = Fs/N
-    alpha_i = np.linspace(-np.size(SCD, 0)/2, np.size(SCD, 0)/2-1, np.size(SCD, 1))*deltaAlpha
-    # Discart Information outside of the domain (Region of support?)
+    alpha_i = np.linspace(-np.size(SCD, 1)/2, (np.size(SCD, 1)/2)-1, np.size(SCD, 1))*deltaAlpha
+    
 
     # Plot SCD
     if plot == True:
@@ -279,6 +279,7 @@ def FAM(x, *args, **kwargs):
         
         fig = plt.figure()
         ax = fig.gca(projection='3d')
+        #ax.set_zlim3d(0, np.max(SCD))
         Alpha_i, F_j = np.meshgrid(alpha_i, f_j)
 
         surf = ax.plot_surface(Alpha_i, F_j, SCD, cmap=cm.coolwarm, linewidth=0, antialiased=False)
@@ -290,6 +291,71 @@ def FAM(x, *args, **kwargs):
         plt.ylabel("f [Hz]")
 
     return SCD, f_j, alpha_i
+
+def cyclicEstimator( SCD, f, alpha ):
+    """
+    Estimates IF frequency and symbol rate from a Spectral Correlation Density.
+    SCD is an m,n matrix of the Spectral Correlation Density.
+    f is a frequency vector of length m.
+    alpha is a cyclic frequency vector of length n
+    """
+    # Find row for alpha=0
+    alpha0 = np.argmin(np.abs(alpha))
+    print("alpha0",alpha[alpha0])
+    # Estimate IF by use of maximum likelyhood estimation
+    # Multiply alpha dimension with triangle vector for improved center frequency estimation.
+    window = signal.triang(len(alpha)) # Triangle window
+    freqEstVetctor = np.dot(window, SCD.T)
+    fCenterIndex = np.argmax(freqEstVetctor)    # np.argmax(SCD[:,alpha0])
+    IF = f[fCenterIndex]
+
+    plt.figure()
+    plt.plot(f, freqEstVetctor)
+    plt.title("freqEstVetctor")
+    plt.show()
+
+    print("IF =", IF)
+    # Estimate symbol rate through maximization of pulse train correlation
+    # Delta train period (discrete)
+    pulsePreiodVector = np.logspace(np.log10(2), np.log10(len(alpha)/2), num=20, base=10.0)
+    print("len(alpha)", len(alpha))
+    print("pulsePreiodVector", pulsePreiodVector)
+    print("np.shape(pulsePreiodVector)", np.shape(pulsePreiodVector))
+
+    plt.figure(figsize=(10, 3))
+    plt.plot( alpha,  np.abs(SCD[fCenterIndex, :]))
+
+    # Todo, apply bandwidth estimation for improved cycle frequency estimation.
+
+
+    corrpeak = np.zeros(len(pulsePreiodVector))
+    for i, pulsePreiod in enumerate(pulsePreiodVector):
+        print("pulsePreiod", pulsePreiod)
+        pulse = np.zeros(np.intc(pulsePreiod))
+        pulsesInTrain = np.intc(len(alpha)/pulsePreiod)-1
+
+        # Ensure at least two pulse trains
+        if pulsesInTrain<2:
+            break
+
+        pulse[-1] = 1/pulsesInTrain
+        print("pulse", pulse)
+        pulseTrain = np.repeat(pulse, pulsesInTrain)
+        print("len(pulseTrain)", len(pulseTrain))
+        # Todo consider FFT-based correlation
+        corVector = np.correlate(pulseTrain, np.abs(SCD[fCenterIndex, :]),  mode="same" )
+        print("len(corVector)", len(corVector))
+        corrpeak[i] = np.argmax(corVector)
+        plt.figure(figsize=(10, 3))
+        x = range(0, len(corVector))
+        plt.step( x,  corVector)
+        plt.show()
+
+
+
+    print("corrpeak", corrpeak)
+    return IF#, R_symb
+
 
 # TODO def AF(x, Fs=1, doppler = 2):
     """
@@ -358,7 +424,7 @@ class chirp:
             omega_t = np.gradient(self.phi_t, self.t)
 
         if plot == True:
-            plt.figure()
+            plt.figure(figsize=(10, 3))
             plt.plot(self.t, omega_t)
             plt.plot(self.t, self.targetOmega_t)
             plt.xlabel('t [s]')
@@ -381,7 +447,7 @@ class chirp:
             gamma_t = np.gradient(self.getInstFreq(plot=False), self.t)
 
         if plot == True:
-            plt.figure()
+            plt.figure(figsize=(10, 3))
             plt.plot(self.t, gamma_t)
             plt.xlabel('t [s]')
             plt.ylabel('f [Hz]')
@@ -501,7 +567,6 @@ class chirp:
         timeFit = np.linspace(-self.T/2, self.T/2, len(omegaFit))
 
         self.c = np.polyfit(timeFit, omegaFit, order)
-
         return self.c
 
 

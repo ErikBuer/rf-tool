@@ -80,7 +80,7 @@ def periodogram(sig, Fs, nfft = 2048):
     # Generate frequency axis
     f = np.linspace(-Fs/2, Fs/2, len(sig_f))
     # Plot
-    plt.figure()
+    plt.figure(figsize=(10, 3))
     plt.plot(f, sig_f)
     plt.xlim([-Fs/2, Fs/2])
     plt.title("Power Spectral Density")
@@ -94,11 +94,11 @@ def welch(x, Fs, nfft = 2048):
     Fs is the sampling frequency [Hz]
     nfft is the length of the FFT
     """
-    f, Pxx_den = signal.welch(x, Fs, nperseg=nfft)
+    f, Pxx_den = signal.welch(x, Fs, nperseg=nfft, return_onesided=False)
     # Remove infinitesimally small components
     sig_f = pow2db(np.maximum(Pxx_den, 1e-16))
     # Plot
-    plt.figure()
+    plt.figure(figsize=(10, 3))
     plt.plot(f, sig_f)
     plt.xlim([-Fs/2, Fs/2])
     plt.title("Welch Power Spectral Density Estimate")
@@ -123,7 +123,7 @@ def magnitudeSpectrum(sig, Fs, nfft = 2048):
     # Generate frequency axis
     f = np.linspace(-Fs/2, Fs/2, len(sig_f))
     # Plot
-    plt.figure()
+    plt.figure(figsize=(10, 3))
     plt.plot(f, sig_f)
     plt.xlim([-Fs/2, Fs/2])
     plt.title("Frequency response")
