@@ -191,7 +191,7 @@ def FAM(x, *args, **kwargs):
     - C Spooner, CSP Estimators: The FFT Accumulation Method, https://cyclostationary.blog/2018/06/01/csp-estimators-the-fft-accumulation-method/, 2018
     """
     plot = kwargs.get('plot', False)
-    scale = kwargs.get('scale', 'linear') # 'linear', 'log', 'dB'
+    scale = kwargs.get('scale', None) # 'absolute', 'log', 'dB'
     Fs = kwargs.get('Fs', 1)
     method = kwargs.get('method', 'non-conj') # 'non-conj' or conj
 
@@ -258,31 +258,45 @@ def FAM(x, *args, **kwargs):
     deltaAlpha = Fs/N
     alpha_i = np.linspace(-np.size(SCD, 1)/2, (np.size(SCD, 1)/2)-1, np.size(SCD, 1))*deltaAlpha
     
+    angSCD = np.angle(SCD)
+    
+    # Scale output
+    if scale=='dB':
+        SCD = util.pow2db(np.abs(SCD))
+    elif scale=='log':
+        SCD = np.log(np.abs(SCD))
+    elif scale=='absolute':
+        SCD = np.abs(SCD)
 
     # Plot SCD
     if plot == True:
-        # Scale output
-        if scale=='dB':
-            SCD = util.mag2db(np.abs(SCD))
-        elif scale=='log':
-            SCD = np.log(np.abs(SCD))
-        else:
-            SCD = np.abs(SCD)
-
+        # Plot magnitude
         plt.figure()
-        plt.imshow(SCD, cmap=cm.coolwarm)
+        if scale=='linear':
+            SCDplt = np.abs(SCD)
+        else:
+            SCDplt = SCD
+
+        plt.imshow(SCDplt, cmap=cm.coolwarm)
         plt.title("Spectral Correlation Density")
         plt.xlabel("alpha [Hz]")
         plt.ylabel("f [Hz]")
         plt.colorbar()
 
+        # Plot phase
+        plt.figure()
+        plt.imshow(angSCD, cmap=cm.coolwarm)
+        plt.title("Spectral Correlation Density (Phase)")
+        plt.xlabel("alpha [Hz]")
+        plt.ylabel("f [Hz]")
+        plt.colorbar()
         
         fig = plt.figure()
         ax = fig.gca(projection='3d')
         #ax.set_zlim3d(0, np.max(SCD))
         Alpha_i, F_j = np.meshgrid(alpha_i, f_j)
 
-        surf = ax.plot_surface(Alpha_i, F_j, SCD, cmap=cm.coolwarm, linewidth=0, antialiased=False)
+        surf = ax.plot_surface(Alpha_i, F_j, SCDplt, cmap=cm.coolwarm, linewidth=0, antialiased=False)
         
         # Add a color bar which maps values to colors.
         fig.colorbar(surf) #, shrink=0.5, aspect=5)
@@ -292,45 +306,78 @@ def FAM(x, *args, **kwargs):
 
     return SCD, f_j, alpha_i
 
+def bandwidthEstimator(psd, f, threshold): # input, xAxis, threshold, scale, domain
+    """
+    Estimate the bandwidth of an incomming signal in time or frequency domain.
+
+    psd is the frequency domain signal to be analyzed (linear scale).
+    xAxis is the time or frequency axis.
+    threshold is the power rollof at which the bandwidth is defined in dB.
+
+    Returns center frequency and threshold dB bandwidth.
+    """
+    
+    fDelta = (f[-1]-f[1])/len(f)
+
+    fCenterIndex = np.argmax(psd)
+    fCenter = f[fCenterIndex]
+    peakPowerdB = psd[fCenterIndex]
+    threshold = util.db2pow(-threshold)*peakPowerdB
+
+    # fUpper
+    fUpperIndex = np.argmin(np.abs(peakPowerdB-psd[fCenterIndex:]-threshold))
+    fUpper = f[fCenterIndex+fUpperIndex]
+
+    # fLower
+    fLowerIndex = np.argmin(np.abs(peakPowerdB-psd[:fCenterIndex]-threshold))
+    fLower = f[fCenterIndex-fLowerIndex]
+    bw = fUpper - fLower
+
+    return fCenter, bw, fUpper, fLower
+
+
 def cyclicEstimator( SCD, f, alpha ):
     """
     Estimates IF frequency and symbol rate from a Spectral Correlation Density.
-    SCD is an m,n matrix of the Spectral Correlation Density.
+    SCD is an m,n matrix of the Spectral Correlation Density (complex).
     f is a frequency vector of length m.
     alpha is a cyclic frequency vector of length n
+
+    returns estimated center frequency and symbol rate 
     """
     # Find row for alpha=0
-    alpha0 = np.argmin(np.abs(alpha))
-    print("alpha0",alpha[alpha0])
-    # Estimate IF by use of maximum likelyhood estimation
+    alpha0Index = np.argmin(np.abs(alpha))
+    print("alpha0",alpha[alpha0Index])
+    # Estimate IF by use of maximum likelyhood estimation.
     # Multiply alpha dimension with triangle vector for improved center frequency estimation.
-    window = signal.triang(len(alpha)) # Triangle window
-    freqEstVetctor = np.dot(window, SCD.T)
-    fCenterIndex = np.argmax(freqEstVetctor)    # np.argmax(SCD[:,alpha0])
+    triangleAlpha = signal.triang(len(alpha)) # Triangle window of length len(alpha).
+    window = np.multiply(np.ones(len(alpha)), triangleAlpha)
+    window[alpha0Index-2:alpha0Index+2] = 0
+    window = window / np.sum(window)
+    freqEstVetctor = np.dot(window, np.abs(SCD.T))       # Utilize the cyclic dimension for frequency estimation.
+    triLen = len(f)/30
+    triangleF = signal.triang(np.intc(triLen))/triLen # Triangle window of length len(f).
+    filteredFreqEstVetctor = signal.fftconvolve(freqEstVetctor, triangleF, mode='same')
+
+    # Estimate signal bandwidth
+    fCenter, bw, fUpper, fLower = bandwidthEstimator(filteredFreqEstVetctor, f, 3)
+
+    fCenterIndex = np.argmin(np.abs(f-fCenter))
     IF = f[fCenterIndex]
+    print("IF =", IF)
 
     plt.figure()
-    plt.plot(f, freqEstVetctor)
+    plt.plot(f, util.pow2db(filteredFreqEstVetctor))
+    plt.plot(f, util.pow2db(freqEstVetctor))
     plt.title("freqEstVetctor")
     plt.show()
 
-    print("IF =", IF)
+    
     # Estimate symbol rate through maximization of pulse train correlation
-    # Delta train period (discrete)
-    pulsePreiodVector = np.logspace(np.log10(2), np.log10(len(alpha)/2), num=20, base=10.0)
-    print("len(alpha)", len(alpha))
-    print("pulsePreiodVector", pulsePreiodVector)
-    print("np.shape(pulsePreiodVector)", np.shape(pulsePreiodVector))
-
-    plt.figure(figsize=(10, 3))
-    plt.plot( alpha,  np.abs(SCD[fCenterIndex, :]))
-
     # Todo, apply bandwidth estimation for improved cycle frequency estimation.
 
-
-    corrpeak = np.zeros(len(pulsePreiodVector))
-    for i, pulsePreiod in enumerate(pulsePreiodVector):
-        print("pulsePreiod", pulsePreiod)
+    corrpeak = np.zeros(np.intc(len(alpha)/2)-1)
+    for i in range(1,len(corrpeak)+1):
         pulse = np.zeros(np.intc(pulsePreiod))
         pulsesInTrain = np.intc(len(alpha)/pulsePreiod)-1
 
@@ -354,7 +401,7 @@ def cyclicEstimator( SCD, f, alpha ):
 
 
     print("corrpeak", corrpeak)
-    return IF#, R_symb
+    return fCenterIndex#, R_symb
 
 
 # TODO def AF(x, Fs=1, doppler = 2):

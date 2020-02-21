@@ -104,6 +104,8 @@ def welch(x, Fs, nfft = 2048):
     plt.title("Welch Power Spectral Density Estimate")
     plt.ylabel("Power density [dBW/Hz]")
     plt.xlabel("Frequency [Hz]")
+    
+    return f, Pxx_den
 
 def magnitudeSpectrum(sig, Fs, nfft = 2048):
     """
