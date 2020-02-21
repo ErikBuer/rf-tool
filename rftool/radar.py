@@ -310,7 +310,7 @@ def bandwidthEstimator(psd, f, threshold): # input, xAxis, threshold, scale, dom
     """
     Estimate the bandwidth of an incomming signal in time or frequency domain.
 
-    psd is the frequency domain signal to be analyzed (linear scale).
+    psd is the frequency domain signal to be analyzed (dB scale).
     xAxis is the time or frequency axis.
     threshold is the power rollof at which the bandwidth is defined in dB.
 
@@ -322,18 +322,17 @@ def bandwidthEstimator(psd, f, threshold): # input, xAxis, threshold, scale, dom
     fCenterIndex = np.argmax(psd)
     fCenter = f[fCenterIndex]
     peakPowerdB = psd[fCenterIndex]
-    threshold = util.db2pow(-threshold)*peakPowerdB
+    thresholddB = peakPowerdB-threshold
 
     # fUpper
-    fUpperIndex = np.argmin(np.abs(peakPowerdB-psd[fCenterIndex:]-threshold))
-    fUpper = f[fCenterIndex+fUpperIndex]
+    fUpperIndex = fCenterIndex + np.argmin(np.abs(psd[fCenterIndex:]-thresholddB))
+    fUpper = f[fUpperIndex]
 
     # fLower
-    fLowerIndex = np.argmin(np.abs(peakPowerdB-psd[:fCenterIndex]-threshold))
-    fLower = f[fCenterIndex-fLowerIndex]
+    fLowerIndex = np.argmin(np.abs(psd[:fCenterIndex]-thresholddB))
+    fLower = f[fLowerIndex]
     bw = fUpper - fLower
-
-    return fCenter, bw, fUpper, fLower
+    return fCenter, bw, fUpper, fLower, fCenterIndex, fUpperIndex, fLowerIndex
 
 
 def cyclicEstimator( SCD, f, alpha ):
@@ -360,7 +359,8 @@ def cyclicEstimator( SCD, f, alpha ):
     filteredFreqEstVetctor = signal.fftconvolve(freqEstVetctor, triangleF, mode='same')
 
     # Estimate signal bandwidth
-    fCenter, bw, fUpper, fLower = bandwidthEstimator(filteredFreqEstVetctor, f, 3)
+    fCenter, bw, fUpper, fLower, fCenterIndex, fUpperIndex, fLowerIndex = bandwidthEstimator(util.pow2db(filteredFreqEstVetctor), f, 0.5)
+    print("fCenter",fCenter, "bw",bw, "fUpper",fUpper, "fLower", fLower)
 
     fCenterIndex = np.argmin(np.abs(f-fCenter))
     IF = f[fCenterIndex]
@@ -374,10 +374,16 @@ def cyclicEstimator( SCD, f, alpha ):
 
     
     # Estimate symbol rate through maximization of pulse train correlation
-    # Todo, apply bandwidth estimation for improved cycle frequency estimation.
+    bandWindow = np.ones(fUpperIndex-fLowerIndex)
+    alphaAverage = np.dot(np.abs(SCD[fLowerIndex:fUpperIndex, :].T), bandWindow)
+
+    plt.figure()
+    plt.plot(alphaAverage)
+    plt.title("alphaAverage")
+    plt.show()
 
     corrpeak = np.zeros(np.intc(len(alpha)/2)-1)
-    for i in range(1,len(corrpeak)+1):
+    for i in range(0,len(corrpeak)):
         pulse = np.zeros(np.intc(pulsePreiod))
         pulsesInTrain = np.intc(len(alpha)/pulsePreiod)-1
 
