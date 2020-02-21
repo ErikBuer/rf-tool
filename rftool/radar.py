@@ -346,7 +346,7 @@ def cyclicEstimator( SCD, f, alpha ):
     """
     # Find row for alpha=0
     alpha0Index = np.argmin(np.abs(alpha))
-    print("alpha0",alpha[alpha0Index])
+    deltaAlpha = (alpha[-1]-alpha[1])/len(alpha)
     # Estimate IF by use of maximum likelyhood estimation.
     # Multiply alpha dimension with triangle vector for improved center frequency estimation.
     triangleAlpha = signal.triang(len(alpha)) # Triangle window of length len(alpha).
@@ -359,55 +359,44 @@ def cyclicEstimator( SCD, f, alpha ):
     filteredFreqEstVetctor = signal.fftconvolve(freqEstVetctor, triangleF, mode='same')
 
     # Estimate signal bandwidth
-    fCenter, bw, fUpper, fLower, fCenterIndex, fUpperIndex, fLowerIndex = bandwidthEstimator(util.pow2db(filteredFreqEstVetctor), f, 0.5)
-    print("fCenter",fCenter, "bw",bw, "fUpper",fUpper, "fLower", fLower)
+    fCenter, bw, fUpper, fLower, fCenterIndex, fUpperIndex, fLowerIndex = bandwidthEstimator(util.pow2db(filteredFreqEstVetctor), f, 1)
 
-    fCenterIndex = np.argmin(np.abs(f-fCenter))
-    IF = f[fCenterIndex]
-    print("IF =", IF)
-
-    plt.figure()
-    plt.plot(f, util.pow2db(filteredFreqEstVetctor))
-    plt.plot(f, util.pow2db(freqEstVetctor))
-    plt.title("freqEstVetctor")
-    plt.show()
-
-    
     # Estimate symbol rate through maximization of pulse train correlation
     bandWindow = np.ones(fUpperIndex-fLowerIndex)
     alphaAverage = np.dot(np.abs(SCD[fLowerIndex:fUpperIndex, :].T), bandWindow)
 
     plt.figure()
-    plt.plot(alphaAverage)
-    plt.title("alphaAverage")
-    plt.show()
+    plt.imshow(np.abs(SCD[fLowerIndex:fUpperIndex, :]), cmap=cm.coolwarm)
+    plt.title("Spectral Correlation Density")
+    plt.xlabel("alpha [Hz]")
+    plt.ylabel("f [Hz]")
+    plt.colorbar()
 
     corrpeak = np.zeros(np.intc(len(alpha)/2)-1)
     for i in range(0,len(corrpeak)):
-        pulse = np.zeros(np.intc(pulsePreiod))
-        pulsesInTrain = np.intc(len(alpha)/pulsePreiod)-1
-
-        # Ensure at least two pulse trains
-        if pulsesInTrain<2:
-            break
-
+        pulse = np.zeros(i+2)
+        pulsesInTrain = np.intc(np.floor(len(alpha)/(2*len(pulse))))-1
         pulse[-1] = 1/pulsesInTrain
-        print("pulse", pulse)
-        pulseTrain = np.repeat(pulse, pulsesInTrain)
-        print("len(pulseTrain)", len(pulseTrain))
-        # Todo consider FFT-based correlation
-        corVector = np.correlate(pulseTrain, np.abs(SCD[fCenterIndex, :]),  mode="same" )
-        print("len(corVector)", len(corVector))
+        pulseTrain = np.tile(pulse, pulsesInTrain)
+        pulseTrainDual = np.concatenate((np.flip(pulseTrain), np.array([0]), pulseTrain), axis=None)
+        #corrpeak[i] = np.dot(pulseTrainDual.T, alphaAverage[alpha0Index-len(pulseTrain)-1:alpha0Index+len(pulseTrain)])
+
+        corVector = signal.fftconvolve(pulseTrainDual, alphaAverage,  mode="same" )
         corrpeak[i] = np.argmax(corVector)
-        plt.figure(figsize=(10, 3))
-        x = range(0, len(corVector))
-        plt.step( x,  corVector)
-        plt.show()
 
 
+    plt.figure(figsize=(10, 3))
+    x = range(0, len(corrpeak))
+    plt.step( x,  corrpeak)
+    plt.title("corrpeak")
+    plt.show()
 
-    print("corrpeak", corrpeak)
-    return fCenterIndex#, R_symb
+
+    R_symb = deltaAlpha*np.argmax(corrpeak)+2
+    
+    print( "Symbol rate =", R_symb )
+    print( "fCenter =", fCenter )
+    return fCenter, R_symb
 
 
 # TODO def AF(x, Fs=1, doppler = 2):
