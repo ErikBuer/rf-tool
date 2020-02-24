@@ -337,8 +337,9 @@ def bandwidthEstimator(psd, f, threshold): # input, xAxis, threshold, scale, dom
 
 def f0MLE(psd, f, peaks):
     """
-    Estimate the fundamental frequency of signal in frequiency domain.
-    PSD is the twosided frequency domain representation of the signal under observation.
+    Maximum likelihood estimation of the fundamental frequency of a signal with repeating harmonics in the frequiency domain.
+
+    PSD is the two-sided frequency domain representation of the signal under observation.
     f is the frequency vector of PSD
     peaks, is the number of harmonic peaks to include in the estimation.
 
@@ -349,15 +350,10 @@ def f0MLE(psd, f, peaks):
     psd = np.add( psd[np.intc(len(psd)/2):np.intc(len(psd)-1)], np.flip(psd[0:np.intc((len(psd)/2)-1)]) )
     f = f[np.intc(len(f)/2):len(f)-1]
 
-    """
-    plt.figure()
-    plt.plot(f, psd)
-    plt.show()
-    """
 
     K = peaks
     k = np.linspace(1, K, K)
-    print("k", k)
+
     fDelta = (f[-1]-f[0])/(len(f)-1)
 
     f0Vec = np.linspace(10, f[-1]/K, len(f))
@@ -367,10 +363,6 @@ def f0MLE(psd, f, peaks):
         f0Disc = f0/fDelta
         idx = np.intc(f0Disc*k)
         lossInv[i] = np.sum(psd[idx])
-
-    plt.figure()
-    plt.plot(f0Vec, lossInv)
-
     f0 = f0Vec[np.argmax(lossInv)]
     return f0
 
