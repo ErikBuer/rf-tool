@@ -317,7 +317,7 @@ def bandwidthEstimator(psd, f, threshold): # input, xAxis, threshold, scale, dom
     Returns center frequency and threshold dB bandwidth.
     """
     
-    fDelta = (f[-1]-f[1])/len(f)
+    fDelta = (f[-1]-f[0])/(len(f)-1)
 
     fCenterIndex = np.argmax(psd)
     fCenter = f[fCenterIndex]
@@ -335,6 +335,47 @@ def bandwidthEstimator(psd, f, threshold): # input, xAxis, threshold, scale, dom
     return fCenter, bw, fUpper, fLower, fCenterIndex, fUpperIndex, fLowerIndex
 
 
+def f0MLE(psd, f, peaks):
+    """
+    Estimate the fundamental frequency of signal in frequiency domain.
+    PSD is the twosided frequency domain representation of the signal under observation.
+    f is the frequency vector of PSD
+    peaks, is the number of harmonic peaks to include in the estimation.
+
+    - Wise et. al, Maximum likelihood pitch estimation, IEEE Transactions on Acoustics, Speech, and Signal Processing, 1976
+    """
+
+    # Convert psd to singlesided
+    psd = np.add( psd[np.intc(len(psd)/2):np.intc(len(psd)-1)], np.flip(psd[0:np.intc((len(psd)/2)-1)]) )
+    f = f[np.intc(len(f)/2):len(f)-1]
+
+    """
+    plt.figure()
+    plt.plot(f, psd)
+    plt.show()
+    """
+
+    K = peaks
+    k = np.linspace(1, K, K)
+    print("k", k)
+    fDelta = (f[-1]-f[0])/(len(f)-1)
+
+    f0Vec = np.linspace(10, f[-1]/K, len(f))
+
+    lossInv = np.zeros(len(f0Vec))
+    for i, f0 in enumerate(f0Vec):
+        f0Disc = f0/fDelta
+        idx = np.intc(f0Disc*k)
+        lossInv[i] = np.sum(psd[idx])
+
+    plt.figure()
+    plt.plot(f0Vec, lossInv)
+
+    f0 = f0Vec[np.argmax(lossInv)]
+    return f0
+
+
+
 def cyclicEstimator( SCD, f, alpha ):
     """
     Estimates IF frequency and symbol rate from a Spectral Correlation Density.
@@ -346,7 +387,7 @@ def cyclicEstimator( SCD, f, alpha ):
     """
     # Find row for alpha=0
     alpha0Index = np.argmin(np.abs(alpha))
-    deltaAlpha = (alpha[-1]-alpha[1])/len(alpha)
+    deltaAlpha = (alpha[-1]-alpha[0])/(len(alpha)-1)
     # Estimate IF by use of maximum likelyhood estimation.
     # Multiply alpha dimension with triangle vector for improved center frequency estimation.
     triangleAlpha = signal.triang(len(alpha)) # Triangle window of length len(alpha).
@@ -365,35 +406,7 @@ def cyclicEstimator( SCD, f, alpha ):
     bandWindow = np.ones(fUpperIndex-fLowerIndex)
     alphaAverage = np.dot(np.abs(SCD[fLowerIndex:fUpperIndex, :].T), bandWindow)
 
-    plt.figure()
-    plt.imshow(np.abs(SCD[fLowerIndex:fUpperIndex, :]), cmap=cm.coolwarm)
-    plt.title("Spectral Correlation Density")
-    plt.xlabel("alpha [Hz]")
-    plt.ylabel("f [Hz]")
-    plt.colorbar()
-
-    corrpeak = np.zeros(np.intc(len(alpha)/2)-1)
-    for i in range(0,len(corrpeak)):
-        pulse = np.zeros(i+2)
-        pulsesInTrain = np.intc(np.floor(len(alpha)/(2*len(pulse))))-1
-        pulse[-1] = 1/pulsesInTrain
-        pulseTrain = np.tile(pulse, pulsesInTrain)
-        pulseTrainDual = np.concatenate((np.flip(pulseTrain), np.array([0]), pulseTrain), axis=None)
-        #corrpeak[i] = np.dot(pulseTrainDual.T, alphaAverage[alpha0Index-len(pulseTrain)-1:alpha0Index+len(pulseTrain)])
-
-        corVector = signal.fftconvolve(pulseTrainDual, alphaAverage,  mode="same" )
-        corrpeak[i] = np.argmax(corVector)
-
-
-    plt.figure(figsize=(10, 3))
-    x = range(0, len(corrpeak))
-    plt.step( x,  corrpeak)
-    plt.title("corrpeak")
-    plt.show()
-
-
-    R_symb = deltaAlpha*np.argmax(corrpeak)+2
-    
+    R_symb = f0MLE(alphaAverage, alpha, 6)
     print( "Symbol rate =", R_symb )
     print( "fCenter =", fCenter )
     return fCenter, R_symb
