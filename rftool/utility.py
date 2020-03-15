@@ -11,25 +11,25 @@ def Gamma2VSWR( Gamma ):
 
 def mag2db( mag ):
     """
-    Conversion between linear magnitude (voltage etc.) and logaithmic scale
+    Conversion between linear magnitude (voltage etc.) and logaithmic decibel scale
     """
     return 20*np.log10( mag)
 
 def db2mag( dB ):
     """
-    Conversion between logaithmic decibell and linear scale
+    Conversion between logaithmic decibel and linear scale
     """
     return np.power( 10, np.divide( dB, 20 ) )
 
 def pow2db( power ):
     """
-    Conversion between linear power (Watt etc.) and logaithmic scale
+    Conversion between linear power (Watt etc.) and logaithmic decibel scale
     """
     return 10*np.log10( power )
 
 def db2pow( dB ):
     """
-    Conversion between logaithmic decibell and linear scale
+    Conversion between logaithmic decibel and linear scale
     """
     return np.power( 10, np.divide( dB, 10) )
 
@@ -43,7 +43,7 @@ def wgndB( x, dB ):
     """
     Apply white Gaussian noise of specified power in dBW to signal.
     """
-    # Apply complex noise to comples signals. Haf power to each component.
+    # Apply complex noise to comples signals. Half power noise to each component.
     if np.iscomplexobj(x)==True:
         wRe = np.random.normal(scale=np.sqrt(db2pow(dB)/2), size=np.shape(x))
         wIm = np.random.normal(scale=np.sqrt(db2pow(dB)/2), size=np.shape(x))
@@ -104,7 +104,6 @@ def welch(x, Fs, nfft = 2048):
     plt.title("Welch Power Spectral Density Estimate")
     plt.ylabel("Power density [dBW/Hz]")
     plt.xlabel("Frequency [Hz]")
-    
     return f, Pxx_den
 
 def magnitudeSpectrum(sig, Fs, nfft = 2048):
@@ -133,8 +132,8 @@ def magnitudeSpectrum(sig, Fs, nfft = 2048):
     plt.xlabel("Frequency [Hz]")
 
 def indefIntegration( x_t, dt ):
-        """
-        Indefinite-like numerical integration. Takes in a vector (function), returns the integrated vector(function).
-        """
-        Sx_tdt = np.cumsum(x_t)*dt
-        return Sx_tdt
+    """
+    Indefinite-like numerical integration. Takes in a vector (function), returns the integrated vector(function).
+    """
+    Sx_tdt = np.cumsum(x_t)*dt
+    return Sx_tdt

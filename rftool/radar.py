@@ -306,35 +306,6 @@ def FAM(x, *args, **kwargs):
 
     return SCD, f_j, alpha_i
 
-def bandwidthEstimator(psd, f, threshold): # input, xAxis, threshold, scale, domain
-    """
-    Estimate the bandwidth of an incomming signal in time or frequency domain.
-
-    psd is the frequency domain signal to be analyzed (dB scale).
-    xAxis is the time or frequency axis.
-    threshold is the power rollof at which the bandwidth is defined in dB.
-
-    Returns center frequency and threshold dB bandwidth.
-    """
-    
-    fDelta = (f[-1]-f[0])/(len(f)-1)
-
-    fCenterIndex = np.argmax(psd)
-    fCenter = f[fCenterIndex]
-    peakPowerdB = psd[fCenterIndex]
-    thresholddB = peakPowerdB-threshold
-
-    # fUpper
-    fUpperIndex = fCenterIndex + np.argmin(np.abs(psd[fCenterIndex:]-thresholddB))
-    fUpper = f[fUpperIndex]
-
-    # fLower
-    fLowerIndex = np.argmin(np.abs(psd[:fCenterIndex]-thresholddB))
-    fLower = f[fLowerIndex]
-    bw = fUpper - fLower
-    return fCenter, bw, fUpper, fLower, fCenterIndex, fUpperIndex, fLowerIndex
-
-
 def f0MLE(psd, f, peaks):
     """
     Maximum likelihood estimation of the fundamental frequency of a signal with repeating harmonics in the frequiency domain.
@@ -366,6 +337,33 @@ def f0MLE(psd, f, peaks):
     f0 = f0Vec[np.argmax(lossInv)]
     return f0
 
+def bandwidthEstimator(psd, f, threshold):
+    """
+    Estimate the bandwidth of an incomming signal in time or frequency domain.
+
+    psd is the frequency domain signal to be analyzed (dB scale).
+    xAxis is the time or frequency axis.
+    threshold is the power rollof at which the bandwidth is defined in dB.
+
+    Returns center frequency and threshold dB bandwidth.
+    """
+    
+    fDelta = (f[-1]-f[0])/(len(f)-1)
+
+    fCenterIndex = np.argmax(psd)
+    fCenter = f[fCenterIndex]
+    peakPowerdB = psd[fCenterIndex]
+    thresholddB = peakPowerdB-threshold
+
+    # fUpper
+    fUpperIndex = fCenterIndex + np.argmin(np.abs(psd[fCenterIndex:]-thresholddB))
+    fUpper = f[fUpperIndex]
+
+    # fLower
+    fLowerIndex = np.argmin(np.abs(psd[:fCenterIndex]-thresholddB))
+    fLower = f[fLowerIndex]
+    bw = fUpper - fLower
+    return fCenter, bw, fUpper, fLower, fCenterIndex, fUpperIndex, fLowerIndex
 
 
 def cyclicEstimator( SCD, f, alpha ):
@@ -398,9 +396,8 @@ def cyclicEstimator( SCD, f, alpha ):
     bandWindow = np.ones(fUpperIndex-fLowerIndex)
     alphaAverage = np.dot(np.abs(SCD[fLowerIndex:fUpperIndex, :].T), bandWindow)
 
+
     R_symb = f0MLE(alphaAverage, alpha, 6)
-    print( "Symbol rate =", R_symb )
-    print( "fCenter =", fCenter )
     return fCenter, R_symb
 
 
@@ -416,6 +413,8 @@ class chirp:
     """
     Object for generating linear and non-linear chirps.
     """
+    t = None
+    T = None
 
     def __init__( self, Fs=1 ):
         """
@@ -423,6 +422,7 @@ class chirp:
         Fs is the intended sampling frequency [Hz]. Fs must be at last twice the highest frequency in the input PSD. If Fs < 2*max(f), then Fs = 2*max(f)
         """
         self.Fs = Fs
+        self.dt = 1/self.Fs
 
     def checkSampleRate(self):
         """
@@ -624,6 +624,13 @@ class chirp:
         
         bitStream is the bitstream to be modulated (numpy array).
         """
+
+        # Generate t and T if it doesn't exist
+        if self.T is None:
+            self.T = (self.points-1)*self.dt
+        if self.t is None:
+            self.t = np.linspace(-self.T/2, self.T/2, self.points)
+
         # Calculate length of signal
         sigLen = len(bitstream)*self.points
         # generate frame
