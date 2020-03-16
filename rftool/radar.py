@@ -7,6 +7,7 @@ import numpy as np
 from mpl_toolkits.mplot3d import axes3d     # 3D plot
 import matplotlib.pyplot as plt
 from matplotlib import cm
+colorMap = cm.coolwarm
 
 from pyhht.visualization import plot_imfs   # Hilbert-Huang TF analysis
 from pyhht import EMD                       # Hilbert-Huang TF analysis
@@ -136,7 +137,7 @@ def hilbert_spectrum( sig, Fs=1, *args, **kwargs):
     intensity = np.absolute(signal.hilbert(imfs))
     plt.figure(figsize=(10, 3))
     for i in range(np.size(instFreq,0)):
-        plt.scatter(t, instFreq[i], c=intensity[i], s=5, alpha=0.3, cmap=cm.coolwarm)
+        plt.scatter(t, instFreq[i], c=intensity[i], s=5, alpha=0.3, cmap=colorMap)
     plt.legend(plotLabel)
     plt.colorbar()
 
@@ -277,7 +278,7 @@ def FAM(x, *args, **kwargs):
         else:
             SCDplt = SCD
 
-        plt.imshow(SCDplt, cmap=cm.coolwarm)
+        plt.imshow(SCDplt, cmap=colorMap)
         plt.title("Spectral Correlation Density")
         plt.xlabel("alpha [Hz]")
         plt.ylabel("f [Hz]")
@@ -285,7 +286,7 @@ def FAM(x, *args, **kwargs):
 
         # Plot phase
         plt.figure()
-        plt.imshow(angSCD, cmap=cm.coolwarm)
+        plt.imshow(angSCD, cmap=colorMap)
         plt.title("Spectral Correlation Density (Phase)")
         plt.xlabel("alpha [Hz]")
         plt.ylabel("f [Hz]")
@@ -296,7 +297,7 @@ def FAM(x, *args, **kwargs):
         #ax.set_zlim3d(0, np.max(SCD))
         Alpha_i, F_j = np.meshgrid(alpha_i, f_j)
 
-        surf = ax.plot_surface(Alpha_i, F_j, SCDplt, cmap=cm.coolwarm, linewidth=0, antialiased=False)
+        surf = ax.plot_surface(Alpha_i, F_j, SCDplt, cmap=colorMap, linewidth=0, antialiased=False)
         
         # Add a color bar which maps values to colors.
         fig.colorbar(surf) #, shrink=0.5, aspect=5)
@@ -337,9 +338,48 @@ def f0MLE(psd, f, peaks):
     f0 = f0Vec[np.argmax(lossInv)]
     return f0
 
+def carierFrequencyEstimator(sig_t, Fs, *args, **kwargs):
+    """
+    Estimate the carrier frequency of a signal using an autocorrelation method, or a frequency domain maximum likelihood method.
+    Autocorrelation method is applicable for sigle carrier signals as ASK, PSK, QAM.
+    MLE method is applicable for the signal above in addition to continious carrier signals such as chirp.
+
+    sig_t is the signal being analyzed.
+    Fs is the sampling frequency.
+    method decides which method is used, 'xcor' for autocorrelation method (default), 'mle' for maximum likelihood method.
+
+    Correlation method:
+    - Z. Yu et. al, A blind carrier frequency estimation algorithm for digitally modulated signals, IEEE 2004
+    - Wang et. al, Improved Carrier Frequency Estimation Based on Autocorrelation, Advances in Computer, Communication, Control and Automation, Springer 2011
+
+    Maximum likelihood method:
+    - Stotica et. al, Maximum Likelihood Estimation of the Parameters of Multiple Sinusoids from Noisy Measurements, IEEE 1989
+    """
+    method = kwargs.get('method', None)
+
+    if method == None:
+        method = 'xcor'
+    elif method == 'xcor':
+        def autocorr(x):
+            result = np.divide( signal.correlate(x, x, mode='full', method='fft'), len(x)-1 )
+            return result[np.intc(len(result)/2):]
+
+        L = len(sig_t)
+        r_xx_l = autocorr(sig_t)
+        Beta_l = np.angle(np.power(r_xx_l[1:] + np.conj(r_xx_l[:len(r_xx_l)-1]), 2))
+        fCenter = Fs/(4*np.pi*(L-2))*np.sum(Beta_l)
+    elif method == 'mle':
+        nfft = 2048
+        f, sig_f = signal.welch(sig_t, Fs, nperseg=nfft, return_onesided=True)
+        fCenter = f[np.argmax(sig_f)]
+    else:
+        fCenter = None
+
+    return fCenter
+
 def bandwidthEstimator(psd, f, threshold):
     """
-    Estimate the bandwidth of an incomming signal in time or frequency domain.
+    Estimate the bandwidth of an incomming signal in the frequency domain.
 
     psd is the frequency domain signal to be analyzed (dB scale).
     xAxis is the time or frequency axis.
