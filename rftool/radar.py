@@ -188,7 +188,7 @@ def ACF(x, plot = True, *args, **kwargs):
 def FAM(x, *args, **kwargs):
     """
     Estimate the discrete time Spectral Correlation Density (SCD) using the Time-Smoothing FFT Accumulation Method.
-    - Roberts et. al, Computationally Efficient Algorithms for Cyclic Spectral Analysis, IEEE SP Magazine, 1991
+    - Roberts et al., Computationally Efficient Algorithms for Cyclic Spectral Analysis, IEEE SP Magazine, 1991
     - C Spooner, CSP Estimators: The FFT Accumulation Method, https://cyclostationary.blog/2018/06/01/csp-estimators-the-fft-accumulation-method/, 2018
     """
     plot = kwargs.get('plot', False)
@@ -315,7 +315,7 @@ def f0MLE(psd, f, peaks):
     f is the frequency vector of PSD
     peaks, is the number of harmonic peaks to include in the estimation.
 
-    - Wise et. al, Maximum likelihood pitch estimation, IEEE Transactions on Acoustics, Speech, and Signal Processing, 1976
+    - Wise et al., Maximum likelihood pitch estimation, IEEE Transactions on Acoustics, Speech, and Signal Processing, 1976
     """
 
     # Convert psd to singlesided
@@ -349,11 +349,11 @@ def carierFrequencyEstimator(sig_t, Fs, *args, **kwargs):
     method decides which method is used, 'xcor' for autocorrelation method (default), 'mle' for maximum likelihood method.
 
     Correlation method:
-    - Z. Yu et. al, A blind carrier frequency estimation algorithm for digitally modulated signals, IEEE 2004
-    - Wang et. al, Improved Carrier Frequency Estimation Based on Autocorrelation, Advances in Computer, Communication, Control and Automation, Springer 2011
+    - Z. Yu et al., A blind carrier frequency estimation algorithm for digitally modulated signals, IEEE 2004
+    - Wang et al., Improved Carrier Frequency Estimation Based on Autocorrelation, Advances in Computer, Communication, Control and Automation, Springer 2011
 
     Maximum likelihood method:
-    - Stotica et. al, Maximum Likelihood Estimation of the Parameters of Multiple Sinusoids from Noisy Measurements, IEEE 1989
+    - Stotica et al., Maximum Likelihood Estimation of the Parameters of Multiple Sinusoids from Noisy Measurements, IEEE 1989
     """
     method = kwargs.get('method', None)
 
