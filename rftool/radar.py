@@ -347,6 +347,7 @@ def carierFrequencyEstimator(sig_t, Fs, *args, **kwargs):
     sig_t is the signal being analyzed.
     Fs is the sampling frequency.
     method decides which method is used, 'xcor' for autocorrelation method (default), 'mle' for maximum likelihood method.
+    nfft configures the length of the FFT used in the MLE method.
 
     Correlation method:
     - Z. Yu et al., A blind carrier frequency estimation algorithm for digitally modulated signals, IEEE 2004
@@ -356,6 +357,7 @@ def carierFrequencyEstimator(sig_t, Fs, *args, **kwargs):
     - Stotica et al., Maximum Likelihood Estimation of the Parameters of Multiple Sinusoids from Noisy Measurements, IEEE 1989
     """
     method = kwargs.get('method', None)
+    nfft = kwargs.get('nfft', 2048)
 
     if method == None:
         method = 'xcor'
@@ -369,13 +371,39 @@ def carierFrequencyEstimator(sig_t, Fs, *args, **kwargs):
         Beta_l = np.angle(np.power(r_xx_l[1:] + np.conj(r_xx_l[:len(r_xx_l)-1]), 2))
         fCenter = Fs/(4*np.pi*(L-2))*np.sum(Beta_l)
     elif method == 'mle':
-        nfft = 2048
         f, sig_f = signal.welch(sig_t, Fs, nperseg=nfft, return_onesided=True)
         fCenter = f[np.argmax(sig_f)]
     else:
         fCenter = None
 
     return fCenter
+
+
+def pulseCarrierCRLB(p_n, K, l_k, N):
+    """
+    Calculates the Cramer-Rao Lower Bound for estimation of carrier frequency of a pulse train of unknown coherent pulses.
+
+    p_n is a single pulse (time series) of appropriate power.
+	K is the number of pulses in the pulse train.
+	l_k is the discrete pulse times [sample].
+    N is a scalar or vector representing the variance of the noise. (Noise power).
+
+    - POURHOMAYOUN, et al., Cramer-Rao Lower Bound for Frequency Estimation for Coherent Pulse Train With Unknown Pulse, IEEE 2013
+    """
+    # Calculate pulse energy
+    E0 = util.energy(p_n)
+    # Pulse length
+    M = len(p_n)
+    # Pulse bandwidth
+    B0 = util.energy(np.gradient(p_n)) / E0
+    # Time-frequency cross-coupling (skew)
+    C0 = np.imag( np.sum( np.multiply( p_n, np.conj(np.gradient(p_n)) ) ) )
+    R1 = np.mean(l_k)
+    R2 = np.mean(np.power(l_k, 2))
+    # Variance bound of frequency estimate
+    var_theta = np.divide( N, 2*K*(E0-(np.power(C0, 2) / (B0*E0)))*(R2-np.power(R1, 2)) )
+    return var_theta
+
 
 def bandwidthEstimator(psd, f, threshold):
     """

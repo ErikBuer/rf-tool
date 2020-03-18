@@ -39,6 +39,12 @@ def powerdB( x ):
     """
     return pow2db(np.mean(np.power(x, 2)))
 
+def energy( x ):
+    """
+    Calculate the signal energy.
+    """
+    return np.sum(np.power(np.abs(x), 2))
+
 def wgndB( x, dB ):
     """
     Apply white Gaussian noise of specified power in dBW to signal.
