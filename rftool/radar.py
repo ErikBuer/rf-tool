@@ -278,7 +278,7 @@ def FAM(x, *args, **kwargs):
         else:
             SCDplt = SCD
 
-        plt.imshow(SCDplt, cmap=colorMap)
+        plt.pcolormesh(alpha_i, f_j, SCDplt, cmap=colorMap)
         plt.title("Spectral Correlation Density")
         plt.xlabel("alpha [Hz]")
         plt.ylabel("f [Hz]")
@@ -286,12 +286,14 @@ def FAM(x, *args, **kwargs):
 
         # Plot phase
         plt.figure()
-        plt.imshow(angSCD, cmap=colorMap)
+        plt.pcolormesh(alpha_i, f_j, angSCD, cmap=colorMap)
         plt.title("Spectral Correlation Density (Phase)")
         plt.xlabel("alpha [Hz]")
         plt.ylabel("f [Hz]")
         plt.colorbar()
         
+        # Plot Correlation Density as Surf
+        """
         fig = plt.figure()
         ax = fig.gca(projection='3d')
         #ax.set_zlim3d(0, np.max(SCD))
@@ -304,6 +306,7 @@ def FAM(x, *args, **kwargs):
         plt.title("Spectral Correlation Density")
         plt.xlabel("alpha [Hz]")
         plt.ylabel("f [Hz]")
+        """
 
     return SCD, f_j, alpha_i
 
@@ -372,16 +375,58 @@ def carierFrequencyEstimator(sig_t, Fs, *args, **kwargs):
         fCenter = Fs/(4*np.pi*(L-2))*np.sum(Beta_l)
     elif method == 'mle':
         f, sig_f = signal.welch(sig_t, Fs, nperseg=nfft, return_onesided=True)
-        fCenter = f[np.argmax(sig_f)]
+        fCenter, fCenterIndex = fftQuadraticInterpolation(np.abs(sig_f), f)
     else:
         fCenter = None
 
     return fCenter
 
+def fftQuadraticInterpolation(X_f, f):
+    """
+    Estimate the carrier frequency of a signal using quadratic interpolation.
+    This function is called from carierFrequencyEstimator.
+
+    X_f is the complex frequency domain vector of the signal.
+    f is the corresponding frequency vector.
+
+    Returns the center frequency and its index
+    """
+    # Magnitude vector
+    mag = np.abs(X_f)
+    # Find frequncy bin with highest magnitude
+    k = np.argmax(mag)
+
+
+    A = np.array([[f[k-1]**2 ,f[k-1] ,1],[f[k]*2, f[k], 1],[f[k+1]**2, f[k+1], 1]])
+    C = np.array([[mag[k-1]],[mag[k]],[mag[k+1]]])
+    Coeff = np.dot(np.linalg.inv(A), C)
+    a2, a1, a0 = Coeff
+
+
+    # Quadratic fit around argmax and neighboring bins
+    #[a0, a1, a2] = np.polynomial.polynomial.polyfit(f[k-1:k+2], mag[k-1:k+2], 2)
+
+    """
+    #! Debug code
+    plt.figure()
+    plt.stem(f[k-1:k+2], mag[k-1:k+2])
+    polyFreq = np.linspace(f[k-1], f[k+1], 11)
+    polyCurve = np.polynomial.polynomial.polyval(polyFreq, [a0, a1, a2])
+    plt.plot( polyFreq,polyCurve )
+    plt.show()
+    #! End debug code
+    """
+
+    # Fint Maximum
+    fQuad = -a1/(2*a2)
+    #t0 = T*n0
+    #phase = np.angle(np.exp(-1j*2*np.pi*fQuad*t0)*X_f[k])
+    return fQuad, k
 
 def pulseCarrierCRLB(p_n, K, l_k, N):
     """
     Calculates the Cramer-Rao Lower Bound for estimation of carrier frequency of a pulse train of unknown coherent pulses.
+    Returns CRLB in angular frequency.
 
     p_n is a single pulse (time series) of appropriate power.
 	K is the number of pulses in the pulse train.
@@ -398,8 +443,8 @@ def pulseCarrierCRLB(p_n, K, l_k, N):
     B0 = util.energy(np.gradient(p_n)) / E0
     # Time-frequency cross-coupling (skew)
     C0 = np.imag( np.sum( np.multiply( p_n, np.conj(np.gradient(p_n)) ) ) )
-    R1 = np.mean(l_k)
-    R2 = np.mean(np.power(l_k, 2))
+    R1 = np.mean(l_k[1:])
+    R2 = np.mean(np.power(l_k[1:], 2))
     # Variance bound of frequency estimate
     var_theta = np.divide( N, 2*K*(E0-(np.power(C0, 2) / (B0*E0)))*(R2-np.power(R1, 2)) )
     return var_theta
@@ -418,8 +463,7 @@ def bandwidthEstimator(psd, f, threshold):
     
     fDelta = (f[-1]-f[0])/(len(f)-1)
 
-    fCenterIndex = np.argmax(psd)
-    fCenter = f[fCenterIndex]
+    fCenter, fCenterIndex = fftQuadraticInterpolation(np.sqrt(util.db2pow(psd)), f)
     peakPowerdB = psd[fCenterIndex]
     thresholddB = peakPowerdB-threshold
 

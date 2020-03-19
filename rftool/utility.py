@@ -37,7 +37,7 @@ def powerdB( x ):
     """
     Calculate the average signal power in dBW.
     """
-    return pow2db(np.mean(np.power(x, 2)))
+    return pow2db(np.mean(np.power(np.abs(x), 2)))
 
 def energy( x ):
     """
