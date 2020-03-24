@@ -91,6 +91,32 @@ def Shnidman( Pfa, Pd, N, SW ):
     SNRdB = 10*np.log10(X1)
     return SNRdB
 
+def pulseCarrierCRLB(p_n, K, l_k, N):
+    """
+    Calculates the Cramer-Rao Lower Bound for estimation of carrier frequency of a pulse train of unknown coherent pulses.
+    Returns CRLB in angular frequency.
+
+    p_n is a single pulse (time series) of appropriate power.
+	K is the number of pulses in the pulse train.
+	l_k is the discrete pulse times [sample].
+    N is a scalar or vector representing the variance of the noise. (Noise power).
+
+    - POURHOMAYOUN, et al., Cramer-Rao Lower Bound for Frequency Estimation for Coherent Pulse Train With Unknown Pulse, IEEE 2013
+    """
+    # Calculate pulse energy
+    E0 = util.energy(p_n)
+    # Pulse length
+    M = len(p_n)
+    # Pulse bandwidth
+    B0 = util.energy(np.gradient(p_n)) / E0
+    # Time-frequency cross-coupling (skew)
+    C0 = np.imag( np.sum( np.multiply( p_n, np.conj(np.gradient(p_n)) ) ) )
+    R1 = np.mean(l_k[1:])
+    R2 = np.mean(np.power(l_k[1:], 2))
+    # Variance bound of frequency estimate
+    var_theta = np.divide( N, 2*K*(E0-(np.power(C0, 2) / (B0*E0)))*(R2-np.power(R1, 2)) )
+    return var_theta
+
 def upconvert( sig, f_c, Fs=1 ):
     """
     Upconvert baseband waveform to IF
@@ -341,11 +367,83 @@ def f0MLE(psd, f, peaks):
     f0 = f0Vec[np.argmax(lossInv)]
     return f0
 
+def instFreq(sig_t, Fs, method='derivative'):
+    """
+    Estimate the instantaneous frequency of a time series.
+
+    sig_t is the signal time series.
+    Fs is the sample frequency.
+    method decides the estimation method:
+        'derivative' is a numerical approximation of the following $f(t) = \frac{1}{2\pi}\od{\Phi(t)}{t}$
+        'BarnesTwo' is Barnes "two-point filter approximation".
+        'BarnesThree' is the Barnes "three-point filter approximation".
+        'Yilmaz' is the method of Yilmaz.
+
+    Returns the instantaneous frequency over time.
+    
+    """
+    if np.isrealobj(sig_t):
+        sig_t = signal.hilbert(sig_t)
+
+    def Derivative(sig_t, Fs):
+        phi_t = np.unwrap(np.angle(sig_t))
+        omega_t = np.gradient(phi_t, 1/Fs)
+        f_t = np.divide(omega_t, 2*np.pi)
+        return f_t
+
+    def BarnesTwo(sig_t, Fs):
+        T=1/Fs
+        x = np.real(sig_t)
+        y = np.imag(sig_t)
+
+        a = np.multiply(x[:-1], y[1:])
+        b = np.multiply(x[1:], y[:-1])
+        c = np.multiply(x[:-1], x[1:])
+        d = np.multiply(y[:-1], y[1:])
+        f_t = 1/(2*np.pi*T)*np.arctan( np.divide(np.subtract(a, b), np.add(c, d)) )
+        return f_t
+
+    def BarnesThree(sig_t, Fs):
+        T=1/Fs
+        x = np.real(sig_t)
+        y = np.imag(sig_t)
+
+        a = np.multiply(x[:-2], y[2:])
+        b = np.multiply(x[2:], y[:-2])
+        c = np.multiply(x[:-2], x[2:])
+        d = np.multiply(y[:-2], y[2:])
+        f_t = 1/(4*np.pi*T)*np.arctan( np.divide(np.subtract(a, b), np.add(c, d)) )
+        return f_t
+
+    def Yilmaz(sig_t, Fs):
+        T=1/Fs
+        x = np.real(sig_t)
+        y = np.imag(sig_t)
+
+        a = np.multiply(x[:-1], y[1:])
+        b = np.multiply(x[1:], y[:-1])
+        c = np.multiply(x[:-1], x[1:])
+        d = np.multiply(y[:-1], y[1:])
+        f_t = 2/(np.pi*T)*( np.divide(np.subtract(a, b), np.add(np.power(c,2), np.power(d,2))) )
+        return f_t
+
+    if method=='derivative':
+        f_t = Derivative(sig_t, Fs)
+    elif method=='BarnesTwo':
+        f_t = BarnesTwo(sig_t, Fs)
+    elif method=='BarnesThree':
+        f_t = BarnesThree(sig_t, Fs)
+    elif method=='Yilmaz':
+        f_t = Yilmaz(sig_t, Fs)
+    return f_t
+
+
 def carierFrequencyEstimator(sig_t, Fs, *args, **kwargs):
     """
     Estimate the carrier frequency of a signal using an autocorrelation method, or a frequency domain maximum likelihood method.
     Autocorrelation method is applicable for sigle carrier signals as ASK, PSK, QAM.
     MLE method is applicable for the signal above in addition to continious carrier signals such as chirp.
+        The MLE method utilizes either periodogram or Welch's method of spectral estimation.
 
     sig_t is the signal being analyzed.
     Fs is the sampling frequency.
@@ -364,7 +462,8 @@ def carierFrequencyEstimator(sig_t, Fs, *args, **kwargs):
 
     if method == None:
         method = 'xcor'
-    elif method == 'xcor':
+    
+    if method == 'xcor':
         def autocorr(x):
             result = np.divide( signal.correlate(x, x, mode='full', method='fft'), len(x)-1 )
             return result[np.intc(len(result)/2):]
@@ -374,7 +473,12 @@ def carierFrequencyEstimator(sig_t, Fs, *args, **kwargs):
         Beta_l = np.angle(np.power(r_xx_l[1:] + np.conj(r_xx_l[:len(r_xx_l)-1]), 2))
         fCenter = Fs/(4*np.pi*(L-2))*np.sum(Beta_l)
     elif method == 'mle':
-        f, sig_f = signal.welch(sig_t, Fs, nperseg=nfft, return_onesided=True)
+        # Select appropriate transform, periodogram or Welch's method
+        if nfft<len(sig_t):
+            f, p_xx = signal.welch(sig_t, Fs, nperseg=nfft, return_onesided=True)
+            sig_f = np.sqrt(p_xx)
+        else:
+            f, sig_f = util.magnitudeSpectrum(sig_t, Fs, nfft=nfft)
         fCenter, fCenterIndex = fftQuadraticInterpolation(np.abs(sig_f), f)
     else:
         fCenter = None
@@ -393,18 +497,12 @@ def fftQuadraticInterpolation(X_f, f):
     """
     # Magnitude vector
     mag = np.abs(X_f)
+
     # Find frequncy bin with highest magnitude
     k = np.argmax(mag)
 
-
-    A = np.array([[f[k-1]**2 ,f[k-1] ,1],[f[k]*2, f[k], 1],[f[k+1]**2, f[k+1], 1]])
-    C = np.array([[mag[k-1]],[mag[k]],[mag[k+1]]])
-    Coeff = np.dot(np.linalg.inv(A), C)
-    a2, a1, a0 = Coeff
-
-
-    # Quadratic fit around argmax and neighboring bins
-    #[a0, a1, a2] = np.polynomial.polynomial.polyfit(f[k-1:k+2], mag[k-1:k+2], 2)
+    #Quadratic fit around argmax and neighboring bins
+    [a0, a1, a2] = np.polynomial.polynomial.polyfit(f[k-1:k+2], mag[k-1:k+2], 2)
 
     """
     #! Debug code
@@ -422,33 +520,6 @@ def fftQuadraticInterpolation(X_f, f):
     #t0 = T*n0
     #phase = np.angle(np.exp(-1j*2*np.pi*fQuad*t0)*X_f[k])
     return fQuad, k
-
-def pulseCarrierCRLB(p_n, K, l_k, N):
-    """
-    Calculates the Cramer-Rao Lower Bound for estimation of carrier frequency of a pulse train of unknown coherent pulses.
-    Returns CRLB in angular frequency.
-
-    p_n is a single pulse (time series) of appropriate power.
-	K is the number of pulses in the pulse train.
-	l_k is the discrete pulse times [sample].
-    N is a scalar or vector representing the variance of the noise. (Noise power).
-
-    - POURHOMAYOUN, et al., Cramer-Rao Lower Bound for Frequency Estimation for Coherent Pulse Train With Unknown Pulse, IEEE 2013
-    """
-    # Calculate pulse energy
-    E0 = util.energy(p_n)
-    # Pulse length
-    M = len(p_n)
-    # Pulse bandwidth
-    B0 = util.energy(np.gradient(p_n)) / E0
-    # Time-frequency cross-coupling (skew)
-    C0 = np.imag( np.sum( np.multiply( p_n, np.conj(np.gradient(p_n)) ) ) )
-    R1 = np.mean(l_k[1:])
-    R2 = np.mean(np.power(l_k[1:], 2))
-    # Variance bound of frequency estimate
-    var_theta = np.divide( N, 2*K*(E0-(np.power(C0, 2) / (B0*E0)))*(R2-np.power(R1, 2)) )
-    return var_theta
-
 
 def bandwidthEstimator(psd, f, threshold):
     """
@@ -499,10 +570,10 @@ def cyclicEstimator( SCD, f, alpha ):
     freqEstVetctor = np.dot(window, np.abs(SCD.T))       # Utilize the cyclic dimension for frequency estimation.
     triLen = len(f)/30
     triangleF = signal.triang(np.intc(triLen))/triLen # Triangle window of length len(f).
-    filteredFreqEstVetctor = signal.fftconvolve(freqEstVetctor, triangleF, mode='same')
+    freqEstVetctor = signal.fftconvolve(freqEstVetctor, triangleF, mode='same')
 
     # Estimate signal bandwidth
-    fCenter, bw, fUpper, fLower, fCenterIndex, fUpperIndex, fLowerIndex = bandwidthEstimator(util.pow2db(filteredFreqEstVetctor), f, 1)
+    fCenter, bw, fUpper, fLower, fCenterIndex, fUpperIndex, fLowerIndex = bandwidthEstimator(util.pow2db(freqEstVetctor), f, 1.5)
 
     # Estimate symbol rate through maximization of pulse train correlation
     bandWindow = np.ones(fUpperIndex-fLowerIndex)
@@ -561,14 +632,18 @@ class chirp:
         sig = np.exp(np.multiply(1j*2*np.pi, phi_t))
         return sig
 
-    def genNumerical( self ):
+    def genNumerical( self, direction = None  ):
         """
         Generate Non.Linear Frequency Modualted (NLFM) chirps.
-        - A .W. Doerry, Generating Nonlinear FM Chirp Waveforms for Radar, Sandia National Laboratories, 2006
+        direction controls the chirp direction. 'inverted' inverts the chirp direction.
         """
         dt = 1/self.Fs        # seconds
 
-        phi_t = util.indefIntegration( self.targetOmega_t, dt )
+        omega_t = self.targetOmega_t
+        if direction == 'inverted':
+            omega_t = np.max(omega_t) - (omega_t-np.min(omega_t))
+
+        phi_t = util.indefIntegration( omega_t, dt )
         sig = np.exp(np.multiply(1j*2*np.pi, phi_t))
         return sig
 
@@ -748,14 +823,14 @@ class chirp:
         # generate frame
         waveform = np.empty([sigLen], dtype=complex)
 
-        sig = self.genFromPoly()
-        sigInv = self.genFromPoly('inverted')
+        sig = self.genNumerical()
+        sigInv = self.genNumerical('inverted')
 
         # Iterate through bitstream and add to waveform
         for m, bit in enumerate(bitstream):
-            if bit:
+            if bit==1:
                 waveform[m*self.points:(m+1)*self.points] = sig
-            else:
+            elif bit==0:
                 waveform[m*self.points:(m+1)*self.points] = sigInv
 
         return waveform

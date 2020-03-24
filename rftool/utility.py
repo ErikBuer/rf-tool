@@ -112,12 +112,12 @@ def welch(x, Fs, nfft = 2048):
     plt.xlabel("Frequency [Hz]")
     return f, Pxx_den
 
-def magnitudeSpectrum(sig, Fs, nfft = 2048):
+def magnitudeSpectrum(sig, Fs, nfft = 2048, plot = False):
     """
     Normalized magnitude spectrumPower spectral density
     sig is the signal to be analyzed
     Fs is the sampling frequency [Hz]
-    nfft is the length of the FFT
+    nfft is the length of the FFT. Is set to the singal length if the nfft<len(sig)
     """
     if nfft < len(sig):
         nfft = len(sig)
@@ -125,17 +125,20 @@ def magnitudeSpectrum(sig, Fs, nfft = 2048):
     sig_f = np.fft.fft(sig,nfft)/nfft
     # Shift and normalize
     sig_f = np.abs(np.fft.fftshift(sig_f / abs(sig_f).max()))
-    # Remove infinitesimally small components
-    sig_f = mag2db(np.maximum(sig_f, 1e-10))
     # Generate frequency axis
     f = np.linspace(-Fs/2, Fs/2, len(sig_f))
     # Plot
-    plt.figure(figsize=(10, 3))
-    plt.plot(f, sig_f)
-    plt.xlim([-Fs/2, Fs/2])
-    plt.title("Frequency response")
-    plt.ylabel("Normalized magnitude [dB]")
-    plt.xlabel("Frequency [Hz]")
+    if plot == True:
+        # Remove infinitesimally small components
+        sig_f = mag2db(np.maximum(sig_f, 1e-10))
+
+        plt.figure(figsize=(10, 3))
+        plt.plot(f, sig_f)
+        plt.xlim([-Fs/2, Fs/2])
+        plt.title("Frequency response")
+        plt.ylabel("Normalized magnitude [dB]")
+        plt.xlabel("Frequency [Hz]")
+    return f, sig_f
 
 def indefIntegration( x_t, dt ):
     """
