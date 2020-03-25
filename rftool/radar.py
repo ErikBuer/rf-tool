@@ -430,7 +430,7 @@ def instFreq(sig_t, Fs, method='derivative', *args, **kwargs):
         f_t = 2/(np.pi*T)*( np.divide(np.subtract(a, b), np.add(np.power(c,2), np.power(d,2))) )
         return f_t
     
-    def polyMle(sig_t, Fs, order=6):
+    def polyMle(sig_t, Fs, order=3):
         """
         Estimate the instantaneous frequency through the use of a polynimial phase function and MLE coefficient estimation.
 
@@ -458,22 +458,26 @@ def instFreq(sig_t, Fs, method='derivative', *args, **kwargs):
                 a0 = np.array([0])
                 a = alpha[2:]
                 aVec = np.append(a0, a)
-                print("a", aVec)
                 polyvec = poly.polyval(self.t, aVec)
                 A = alpha[0]
 
                 D_alpha = (1/self.T)*np.sum(np.multiply(self.z_t, np.exp(np.multiply(-1j, polyvec))))
                 L = 2*A*np.real(np.exp(-1j*alpha[1])*D_alpha)*np.power(A, 2)
-                return L
+                return -L
 
             def optimize(self, order):
                 alpha0 = np.random.rand(order+2)
-                phaseOpt = optimize.minimize(self.objectFunction, alpha0, method='L-BFGS-B')
+                #phaseOpt = optimize.minimize(self.objectFunction, alpha0, method='Nelder-Mead')
+
+                minimizer_kwargs = {"method": "BFGS"}
+                phaseOpt = optimize.basinhopping(self.objectFunction, alpha0, minimizer_kwargs=minimizer_kwargs, niter=200)
+                
                 alpha_hat = phaseOpt.x
                 phasePoly = poly.Polynomial(alpha_hat[1:])
+                # Differentiate
                 phasePoly = phasePoly.deriv()
-
-                f_t = 1/(2*np.pi)*poly.polyval(self.t, phasePoly)
+                # Calculate IF
+                f_t = 1/(2*np.pi)*poly.polyval(self.t, phasePoly.coef)
                 return f_t
 
         m_polyOptim = polyOptim(Fs, sig_t)
