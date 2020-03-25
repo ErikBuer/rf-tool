@@ -379,7 +379,8 @@ def instFreq(sig_t, Fs, method='derivative', *args, **kwargs):
         'BarnesTwo' is Barnes "two-point filter approximation".
         'BarnesThree' is the Barnes "three-point filter approximation".
         'Claerbouts' is the Claerbouts approximation.
-        'polyMle' uses a method of phase polynomial.
+        'polyLeastSquares' uses a method of phase polynomial with a least squares coefficient estimation. 
+        'polyMle' uses a method of phase polynomial with a maxumum likelihood coefficient estimation.
 
     Returns the instantaneous frequency over time.
     - A. E. Barnes, The calculation of instantaneous frequency and instantaneous bandwidth, GEOPHYSICS, VOL. 57, NO. 11, 1992
@@ -429,8 +430,24 @@ def instFreq(sig_t, Fs, method='derivative', *args, **kwargs):
         d = np.multiply(y[:-1], y[1:])
         f_t = 2/(np.pi*T)*( np.divide(np.subtract(a, b), np.add(np.power(c,2), np.power(d,2))) )
         return f_t
+
+    def polyLeastSquares(sig_t, Fs, order=6):
+        T = len(sig_t)/Fs
+        t = np.linspace(-T/2, T/2, len(sig_t))
+        f_t = Derivative(sig_t, Fs)
+        
+        # Decimate to 1000 points
+        dFactor = len(sig_t)/1000
+
+        # Resample time series to improve the fitting result.
+        fFit = signal.decimate(f_t, dFactor, ftype='iir', zero_phase=True)
+        timeFit = np.linspace(-T/2, T/2, len(fFit))
+                
+        LsPoly = np.polyfit(timeFit, fFit, order)
+        f_t = poly.polyval(t, LsPoly)
+        return f_t
     
-    def polyMle(sig_t, Fs, order=6):
+    def polyMle(sig_t, Fs, order, *args, **kwargs):
         """
         Estimate the instantaneous frequency through the use of a polynimial phase function and MLE coefficient estimation.
 
@@ -440,15 +457,17 @@ def instFreq(sig_t, Fs, method='derivative', *args, **kwargs):
 
         - Boashash et. al, Algorithms for instantaneous frequency estimation: a comparative study, Proceedings of SPIE, 1990
         """
+        windowSize = kwargs.get('windowSize', None)
+
         class polyOptim:
-            def __init__( self, Fs, sig_t ):
+            def __init__( self, Fs, sig_t, t, windowSize=None):
                 """
                 Fs is the intended sampling frequency [Hz]. Fs must be at last twice the highest frequency in the input PSD. If Fs < 2*max(f), then Fs = 2*max(f)
                 """
                 self.z_t = np.array(sig_t, dtype=complex)    # complex observation
                 self.Fs = Fs
+                self.t = t
                 self.T = len(sig_t)/Fs
-                self.t = np.linspace(-self.T/2, self.T/2, len(sig_t))
 
             def objectFunction(self, a):
                 """
@@ -466,28 +485,57 @@ def instFreq(sig_t, Fs, method='derivative', *args, **kwargs):
                 L = np.abs(np.power(D_alpha, 2))
                 return -L   # Negative as L is to be maximized
 
-            def optimize(self, order):
-                #alpha0 = np.random.rand(order+2)
-                #phaseOpt = optimize.minimize(self.objectFunction, alpha0, method='Nelder-Mead')
-                """
-                minimizer_kwargs = {"method": "BFGS"}
-                phaseOpt = optimize.basinhopping(self.objectFunction, alpha0, minimizer_kwargs=minimizer_kwargs, niter=200)
-                """
-                bounds = list(zip([-100e6]*(order), [100e6]*(order)))
-                phaseOpt = optimize.dual_annealing(self.objectFunction, bounds=bounds, seed=1234)
+            def optimize(self, order, method='dual_annealing'):
+                if method == 'dual_annealing':
+                    bounds = list(zip([-1e6]*(order), [1e6]*(order)))
+                    phaseOpt = optimize.dual_annealing(self.objectFunction, bounds=bounds)
+                elif method == 'Nelder-Mead':
+                    alpha0 = np.random.rand(order)
+                    phaseOpt = optimize.minimize(self.objectFunction, alpha0, method='Nelder-Mead')
+                elif method == 'basinhopping':
+                    alpha0 = np.random.rand(order)
+                    minimizer_kwargs = {"method": "BFGS"}
+                    phaseOpt = optimize.basinhopping(self.objectFunction, alpha0, minimizer_kwargs=minimizer_kwargs, niter=200)
 
                 a0 = np.array([0])
                 alpha_hat = np.append(a0, phaseOpt.x)
                 phasePoly = poly.Polynomial(alpha_hat)
                 # Differentiate
-                phasePoly = phasePoly.deriv()
+                freqPoly = phasePoly.deriv()
                 # Calculate IF
-                f_t = 1/(2*np.pi)*poly.polyval(self.t, phasePoly.coef)
-                return f_t
+                f_t = 1/(2*np.pi)*poly.polyval(self.t, freqPoly.coef)
+                return f_t, freqPoly.coef
+        
+        if windowSize==None:
+            T = len(sig_t)/Fs
+            t = np.linspace(-T/2, T/2, len(sig_t))
+            m_polyOptim = polyOptim(Fs, sig_t, t=t)
+            f_t, coeff = m_polyOptim.optimize(order)
+        else:
+            # Estimate for each chunk of the time series
+            rest = len(sig_t) % windowSize
+            #sig_t = np.append(sig_t, np.zeros(rest))
+            f_t = np.empty(len(sig_t))
+            dt=1/Fs           
 
-        m_polyOptim = polyOptim(Fs, sig_t)
-        f_t = m_polyOptim.optimize(order)
+            # Estimate the remainder
+            if 0<rest:
+                sig_rest_t = sig_t[-rest:]
+                sig_t = sig_t[:-rest]
+                t = np.linspace(-rest*dt/2, rest*dt/2, rest)
+                m_polyOptim = polyOptim(Fs, sig_rest_t, t)
+                f_t[-rest:], coeff = m_polyOptim.optimize(order)
+            
+            t = np.linspace(-windowSize*dt/2, windowSize*dt/2, windowSize)
+            # Create matrix for iteration
+            sigMat = np.reshape(sig_t, ( np.intc(len(sig_t)/windowSize), windowSize ))
+
+            # Estimate in chunks
+            for m, window in enumerate(sigMat):
+                m_polyOptim = polyOptim(Fs, window, t)
+                f_t[m*windowSize:(m+1)*windowSize], coeff = m_polyOptim.optimize(order, method='dual_annealing')
         return f_t
+
 
     if method=='derivative':
         f_t = Derivative(sig_t, Fs)
@@ -497,8 +545,13 @@ def instFreq(sig_t, Fs, method='derivative', *args, **kwargs):
         f_t = BarnesThree(sig_t, Fs)
     elif method=='Claerbouts':
         f_t = Claerbouts(sig_t, Fs)
+    elif method=='polyLeastSquares':
+        order = kwargs.get('order', 6)
+        f_t = polyLeastSquares(sig_t, Fs=Fs, order=order)
     elif method=='polyMle':
-        f_t = polyMle(sig_t, Fs)
+        order = kwargs.get('order', 6)
+        windowSize = kwargs.get('windowSize', None)
+        f_t = polyMle(sig_t, Fs=Fs, order=order, windowSize=windowSize)
     return f_t
 
 
@@ -852,8 +905,9 @@ class chirp:
         # Count iterations
         self.iterationCount = 0
         
-        # Order and initial conditions
-        c0 = np.zeros( order )
+        # TODO: Remove if functioning properly
+        """# Order and initial conditions
+        c0 = np.zeros( order )"""
         
         # Resample time series to improve the fitting result.
         omegaFit = signal.decimate(self.targetOmega_t, 16, ftype='iir', zero_phase=True)
