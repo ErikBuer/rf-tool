@@ -430,7 +430,7 @@ def instFreq(sig_t, Fs, method='derivative', *args, **kwargs):
         f_t = 2/(np.pi*T)*( np.divide(np.subtract(a, b), np.add(np.power(c,2), np.power(d,2))) )
         return f_t
     
-    def polyMle(sig_t, Fs, order=3):
+    def polyMle(sig_t, Fs, order=6):
         """
         Estimate the instantaneous frequency through the use of a polynimial phase function and MLE coefficient estimation.
 
@@ -450,30 +450,35 @@ def instFreq(sig_t, Fs, method='derivative', *args, **kwargs):
                 self.T = len(sig_t)/Fs
                 self.t = np.linspace(-self.T/2, self.T/2, len(sig_t))
 
-            def objectFunction(self, alpha):
+            def objectFunction(self, a):
                 """
                 Object function to maximize.
                 alpha is the parameter vector. alpha=[A, a_0, a_1,..., a_P]
                 """
                 a0 = np.array([0])
-                a = alpha[2:]
+                #a = alpha[1:]
                 aVec = np.append(a0, a)
                 polyvec = poly.polyval(self.t, aVec)
-                A = alpha[0]
+                #A = alpha[0]
 
                 D_alpha = (1/self.T)*np.sum(np.multiply(self.z_t, np.exp(np.multiply(-1j, polyvec))))
-                L = 2*A*np.real(np.exp(-1j*alpha[1])*D_alpha)*np.power(A, 2)
-                return -L
+                #L = 2*A*np.real(np.exp(-1j*alpha[1])*D_alpha)*np.power(A, 2)
+                L = np.abs(np.power(D_alpha, 2))
+                return -L   # Negative as L is to be maximized
 
             def optimize(self, order):
-                alpha0 = np.random.rand(order+2)
+                #alpha0 = np.random.rand(order+2)
                 #phaseOpt = optimize.minimize(self.objectFunction, alpha0, method='Nelder-Mead')
-
+                """
                 minimizer_kwargs = {"method": "BFGS"}
                 phaseOpt = optimize.basinhopping(self.objectFunction, alpha0, minimizer_kwargs=minimizer_kwargs, niter=200)
-                
-                alpha_hat = phaseOpt.x
-                phasePoly = poly.Polynomial(alpha_hat[1:])
+                """
+                bounds = list(zip([-100e6]*(order), [100e6]*(order)))
+                phaseOpt = optimize.dual_annealing(self.objectFunction, bounds=bounds, seed=1234)
+
+                a0 = np.array([0])
+                alpha_hat = np.append(a0, phaseOpt.x)
+                phasePoly = poly.Polynomial(alpha_hat)
                 # Differentiate
                 phasePoly = phasePoly.deriv()
                 # Calculate IF
