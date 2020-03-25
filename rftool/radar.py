@@ -3,6 +3,7 @@ import scipy.optimize as optimize
 import scipy.integrate as integrate
 import scipy.special as special
 import numpy as np
+import numpy.polynomial.polynomial as poly
 
 from mpl_toolkits.mplot3d import axes3d     # 3D plot
 import matplotlib.pyplot as plt
@@ -367,7 +368,7 @@ def f0MLE(psd, f, peaks):
     f0 = f0Vec[np.argmax(lossInv)]
     return f0
 
-def instFreq(sig_t, Fs, method='derivative'):
+def instFreq(sig_t, Fs, method='derivative', *args, **kwargs):
     """
     Estimate the instantaneous frequency of a time series.
 
@@ -377,10 +378,12 @@ def instFreq(sig_t, Fs, method='derivative'):
         'derivative' is a numerical approximation of the following $f(t) = \frac{1}{2\pi}\od{\Phi(t)}{t}$
         'BarnesTwo' is Barnes "two-point filter approximation".
         'BarnesThree' is the Barnes "three-point filter approximation".
-        'Yilmaz' is the method of Yilmaz.
+        'Claerbouts' is the Claerbouts approximation.
+        'polyMle' uses a method of phase polynomial.
 
     Returns the instantaneous frequency over time.
-    
+    - A. E. Barnes, The calculation of instantaneous frequency and instantaneous bandwidth, GEOPHYSICS, VOL. 57, NO. 11, 1992
+    - Boashash et. al, Algorithms for instantaneous frequency estimation: a comparative study, Proceedings of SPIE, 1990
     """
     if np.isrealobj(sig_t):
         sig_t = signal.hilbert(sig_t)
@@ -415,7 +418,7 @@ def instFreq(sig_t, Fs, method='derivative'):
         f_t = 1/(4*np.pi*T)*np.arctan( np.divide(np.subtract(a, b), np.add(c, d)) )
         return f_t
 
-    def Yilmaz(sig_t, Fs):
+    def Claerbouts(sig_t, Fs):
         T=1/Fs
         x = np.real(sig_t)
         y = np.imag(sig_t)
@@ -426,6 +429,56 @@ def instFreq(sig_t, Fs, method='derivative'):
         d = np.multiply(y[:-1], y[1:])
         f_t = 2/(np.pi*T)*( np.divide(np.subtract(a, b), np.add(np.power(c,2), np.power(d,2))) )
         return f_t
+    
+    def polyMle(sig_t, Fs, order=6):
+        """
+        Estimate the instantaneous frequency through the use of a polynimial phase function and MLE coefficient estimation.
+
+        sig_t is the time series to estimate.
+        Fs is the sample frequency.
+        order is the polynomial order.
+
+        - Boashash et. al, Algorithms for instantaneous frequency estimation: a comparative study, Proceedings of SPIE, 1990
+        """
+        class polyOptim:
+            def __init__( self, Fs, sig_t ):
+                """
+                Fs is the intended sampling frequency [Hz]. Fs must be at last twice the highest frequency in the input PSD. If Fs < 2*max(f), then Fs = 2*max(f)
+                """
+                self.z_t = np.array(sig_t, dtype=complex)    # complex observation
+                self.Fs = Fs
+                self.T = len(sig_t)/Fs
+                self.t = np.linspace(-self.T/2, self.T/2, len(sig_t))
+
+            def objectFunction(self, alpha):
+                """
+                Object function to maximize.
+                alpha is the parameter vector. alpha=[A, a_0, a_1,..., a_P]
+                """
+                a0 = np.array([0])
+                a = alpha[2:]
+                aVec = np.append(a0, a)
+                print("a", aVec)
+                polyvec = poly.polyval(self.t, aVec)
+                A = alpha[0]
+
+                D_alpha = (1/self.T)*np.sum(np.multiply(self.z_t, np.exp(np.multiply(-1j, polyvec))))
+                L = 2*A*np.real(np.exp(-1j*alpha[1])*D_alpha)*np.power(A, 2)
+                return L
+
+            def optimize(self, order):
+                alpha0 = np.random.rand(order+2)
+                phaseOpt = optimize.minimize(self.objectFunction, alpha0, method='L-BFGS-B')
+                alpha_hat = phaseOpt.x
+                phasePoly = poly.Polynomial(alpha_hat[1:])
+                phasePoly = phasePoly.deriv()
+
+                f_t = 1/(2*np.pi)*poly.polyval(self.t, phasePoly)
+                return f_t
+
+        m_polyOptim = polyOptim(Fs, sig_t)
+        f_t = m_polyOptim.optimize(order)
+        return f_t
 
     if method=='derivative':
         f_t = Derivative(sig_t, Fs)
@@ -433,8 +486,10 @@ def instFreq(sig_t, Fs, method='derivative'):
         f_t = BarnesTwo(sig_t, Fs)
     elif method=='BarnesThree':
         f_t = BarnesThree(sig_t, Fs)
-    elif method=='Yilmaz':
-        f_t = Yilmaz(sig_t, Fs)
+    elif method=='Claerbouts':
+        f_t = Claerbouts(sig_t, Fs)
+    elif method=='polyMle':
+        f_t = polyMle(sig_t, Fs)
     return f_t
 
 
@@ -510,7 +565,7 @@ def fftQuadraticInterpolation(X_f, f):
     plt.stem(f[k-1:k+2], mag[k-1:k+2])
     polyFreq = np.linspace(f[k-1], f[k+1], 11)
     polyCurve = np.polynomial.polynomial.polyval(polyFreq, [a0, a1, a2])
-    plt.plot( polyFreq,polyCurve )
+    plt.plot( polyFreq, polyCurve )
     plt.show()
     #! End debug code
     """
@@ -549,14 +604,15 @@ def bandwidthEstimator(psd, f, threshold):
     return fCenter, bw, fUpper, fLower, fCenterIndex, fUpperIndex, fLowerIndex
 
 
-def cyclicEstimator( SCD, f, alpha ):
+def cyclicEstimator( SCD, f, alpha, bandLimited=True ):
     """
-    Estimates IF frequency and symbol rate from a Spectral Correlation Density.
+    Estimates center frequency and symbol rate from a Spectral Correlation Density.
     SCD is an m,n matrix of the Spectral Correlation Density (complex).
     f is a frequency vector of length m.
-    alpha is a cyclic frequency vector of length n
+    alpha is a cyclic frequency vector of length n.
+    bandLimited. When set to True, the symbol tate estimator only utilizes the 1 dB bw for estimation. Estimator relies on a >1 dB inband SNR.
 
-    returns estimated center frequency and symbol rate 
+    returns estimated center frequency and symbol rate.
     """
     # Find row for alpha=0
     alpha0Index = np.argmin(np.abs(alpha))
@@ -570,31 +626,25 @@ def cyclicEstimator( SCD, f, alpha ):
     freqEstVetctor = np.dot(window, np.abs(SCD.T))       # Utilize the cyclic dimension for frequency estimation.
     triLen = len(f)/30
     triangleF = signal.triang(np.intc(triLen))/triLen # Triangle window of length len(f).
-    freqEstVetctor = signal.fftconvolve(freqEstVetctor, triangleF, mode='same')
-
-    # Estimate signal bandwidth
-    fCenter, bw, fUpper, fLower, fCenterIndex, fUpperIndex, fLowerIndex = bandwidthEstimator(util.pow2db(freqEstVetctor), f, 1.5)
+    filteredFreqEstVetctor = signal.fftconvolve(freqEstVetctor, triangleF, mode='same') # TODO Check if there are zero-values in freqEstVetctor prior to the filtering.
 
     # Estimate symbol rate through maximization of pulse train correlation
-    bandWindow = np.ones(fUpperIndex-fLowerIndex)
-    alphaAverage = np.dot(np.abs(SCD[fLowerIndex:fUpperIndex, :].T), bandWindow)
+    if bandLimited == True:
+        # Estimate signal bandwidth
+        fCenter, bw, fUpper, fLower, fCenterIndex, fUpperIndex, fLowerIndex = bandwidthEstimator(util.pow2db(filteredFreqEstVetctor), f, 2)
+        bandWindow = np.ones(fUpperIndex-fLowerIndex)
+        alphaAverage = np.dot(np.abs(SCD[fLowerIndex:fUpperIndex, :].T), bandWindow)
+    else:
+        fCenter = None
+        alphaAverage = np.sum(SCD, 0)
 
-
-    R_symb = f0MLE(alphaAverage, alpha, 6)
+    R_symb = f0MLE(alphaAverage, alpha, 5) #! Debug, restet to 6
     return fCenter, R_symb
 
 
-# TODO def AF(x, Fs=1, doppler = 2):
-    """
-    Ambuigity Function
-    x is the signal being analyzed.
-    Fs is the sampling frequency of the signal x [Hz].
-    doppler is the max doppler shift in Hz
-    """
-
 class chirp:
     """
-    Object for generating linear and non-linear chirps.
+    Object for generating linear and non-linear chirp generation.
     """
     t = None
     T = None
