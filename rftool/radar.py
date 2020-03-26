@@ -131,49 +131,121 @@ def upconvert( sig, f_c, Fs=1 ):
     sig = np.multiply(sig, np.exp(1j*phi_j))
     return sig
 
-def hilbert_spectrum( sig, Fs=1, *args, **kwargs):
-    """
-    Hilbert-Huang transform with Hilbert spectral plot.
-    The plot neglects negative frequencies.
-    
-    sig is a time series
-    Fs is the sample frequency
+class HilberHuang:
+    def __init__( self, sig, Fs=1):
+        """
+        Hilbert-Huang transform with Hilbert spectral plot.
+        
+        sig is a time series
+        Fs is the sample frequency
 
-    Based on:
-    - S.E. Hamdi et al., Hilbert-Huang Transform versus Fourier based analysis for diffused ultrasonic waves structural health monitoring in polymer based composite materials, Proceedings of the Acoustics 2012 Nantes Conference.
-    """
-    plotLabel = kwargs.get('label', None)
+        - Huang et. al, The empirical mode decomposition and the Hilbert spectrum for nonlinear and non-stationary time series analysis, Proceedings of the Royal Society of London, 1998
+        - S.E. Hamdi et al., Hilbert-Huang Transform versus Fourier based analysis for diffused ultrasonic waves structural health monitoring in polymer based composite materials, Proceedings of the Acoustics 2012 Nantes Conference.
+        """
+        self.Fs = Fs
 
-    # Hilbert-Huang
-    decomposer = EMD(sig)
-    imfs = decomposer.decompose()
+        # Hilbert-Huang
+        decomposer = EMD(sig)
+        self.imfs = decomposer.decompose()
 
-    imfAngle = np.angle(signal.hilbert(imfs))
-    dt = np.divide(1,Fs)
-    
-    t = np.linspace(0, (sig.shape[0]-1)*dt, sig.shape[0])
+        analyticalIMF = signal.hilbert(self.imfs)
+        imfAngle = np.unwrap(np.angle(analyticalIMF), axis=1)
+        dt = np.divide(1,Fs)
+        # Calculate Hilbert spectrum
+        # Time, frequency, intensity
+        self.t = np.linspace(0, (sig.shape[0]-1)*dt, sig.shape[0])
+        self.IF = np.divide(np.gradient(imfAngle, self.t,axis=1), 2*np.pi)
+        self.intensity = np.absolute(analyticalIMF)
 
-    # Calculate instantaneous frequency
-    instFreq = np.divide(np.gradient(imfAngle,t,axis=1), 2*np.pi)
-    """
-    There is an image of the instantaneous frequency response occuring at -Fs/2. THis is currently not shown in the plot. 
-    """
+    def discreteMatrix( self, frequencyBins=256, *args, **kwargs):
+        """
+        Hilbert-Huang transform with Hilbert spectral plot. The result is a matric of discrete time-frequency bins with the cumulated intensity of the IMFs.
+        The plot neglects negative frequencies.
 
-    # Calculate Hilbert spectrum
-    # Time, frequency, magnitude
-    intensity = np.absolute(signal.hilbert(imfs))
-    plt.figure(figsize=(10, 3))
-    for i in range(np.size(instFreq,0)):
-        plt.scatter(t, instFreq[i], c=intensity[i], s=5, alpha=0.3, cmap=colorMap)
-    plt.legend(plotLabel)
-    plt.colorbar()
+        frequencyBins is the number of discrete bins from 0 Hz to Fs/2
+        includeRes defines whether the residu is included in the spectrum.
 
-    plt.title("Hilbert Spectrum")
-    plt.xlabel('t [s]')
-    plt.ylabel('f [Hz]')
-    plt.ylim(0,np.divide(Fs,2))
-    plt.xlim(t[1], t[-1])
-    plt.tight_layout()
+        Returns a matrix containing the sum energy in each time-frequnecy bin.
+
+        - Huang et. al, The empirical mode decomposition and the Hilbert spectrum for nonlinear and non-stationary time series analysis, Proceedings of the Royal Society of London, 1998
+        - S.E. Hamdi et al., Hilbert-Huang Transform versus Fourier based analysis for diffused ultrasonic waves structural health monitoring in polymer based composite materials, Proceedings of the Acoustics 2012 Nantes Conference.
+        """
+        includeRes = kwargs.get('includeRes', False)
+
+        binSize = (self.Fs/2)/frequencyBins
+        f = np.linspace(0, frequencyBins*binSize, frequencyBins)
+
+        ImfBin = np.intc(np.floor(np.divide(self.IF, binSize)))
+        spectrumMat = np.zeros(( frequencyBins, len(self.t)))
+
+        for m, row in enumerate(ImfBin):
+            for n, fBin in enumerate(row):
+                if fBin<0:
+                    fBin = -fBin
+                spectrumMat[fBin,n] += self.intensity[m,n]
+
+        return f, self.t, spectrumMat
+
+    def discreteSpectrum( self, frequencyBins=256, *args, **kwargs):
+        """
+        Hilbert-Huang transform with Hilbert spectral plot. The result is a matric of discrete time-frequency bins with the cumulated intensity of the IMFs.
+        The plot neglects negative frequencies.
+
+        frequencyBins is the number of discrete bins from 0 Hz to Fs/2
+        includeRes defines whether the residu is included in the spectrum.
+
+        Returns a figure with the sum energy in each time-frequnecy bin.
+
+        - Huang et. al, The empirical mode decomposition and the Hilbert spectrum for nonlinear and non-stationary time series analysis, Proceedings of the Royal Society of London, 1998
+        - S.E. Hamdi et al., Hilbert-Huang Transform versus Fourier based analysis for diffused ultrasonic waves structural health monitoring in polymer based composite materials, Proceedings of the Acoustics 2012 Nantes Conference.
+        """
+        includeRes = kwargs.get('includeRes', False)        
+
+        # Get discrete matrix
+        f, t, spectrumMat = self.discreteMatrix( frequencyBins=frequencyBins, includeRes=includeRes)
+
+        fig = plt.figure(figsize=(10, 3))
+        ax = fig.add_subplot(111)
+        cset = ax.pcolormesh(t, f, spectrumMat, cmap=colorMap)
+        plt.colorbar(cset, ax=ax)
+
+        ax.set_title("Hilbert Spectrum")
+        ax.set_xlabel('t [s]')
+        ax.set_ylabel('f [Hz]')
+        ax.set_ylim(0,np.divide(self.Fs,2))
+        ax.set_xlim(self.t[1], self.t[-1])
+        plt.tight_layout()
+        return fig
+
+    def spectrum( self, *args, **kwargs):
+        """
+        Hilbert-Huang transform with Hilbert spectral plot.
+        The plot neglects negative frequencies.
+        
+        sig is a time series
+        Fs is the sample frequency
+
+        - Huang et. al, The empirical mode decomposition and the Hilbert spectrum for nonlinear and non-stationary time series analysis, Proceedings of the Royal Society of London, 1998
+        - S.E. Hamdi et al., Hilbert-Huang Transform versus Fourier based analysis for diffused ultrasonic waves structural health monitoring in polymer based composite materials, Proceedings of the Acoustics 2012 Nantes Conference.
+        """
+        IncludeRes = kwargs.get('IncludeRes', False)
+
+        # Calculate Hilbert spectrum
+
+        fig = plt.figure(figsize=(10, 3))
+        ax = fig.add_subplot(111)
+        cset = None
+        for i in range(np.size(instFreq,0)):
+            cset = ax.scatter(self.t, self.IF[i], c=self.intensity[i], s=5, alpha=0.3, cmap=colorMap)
+        plt.colorbar(cset, ax=ax)
+
+        ax.set_title("Hilbert Spectrum")
+        ax.set_xlabel('t [s]')
+        ax.set_ylabel('f [Hz]')
+        ax.set_ylim(0,np.divide(Fs,2))
+        ax.set_xlim(t[1], t[-1])
+        plt.tight_layout()
+        return fig
 
 def ACF(x, plot = True, *args, **kwargs):
     """
@@ -431,13 +503,13 @@ def instFreq(sig_t, Fs, method='derivative', *args, **kwargs):
         f_t = 2/(np.pi*T)*( np.divide(np.subtract(a, b), np.add(np.power(c,2), np.power(d,2))) )
         return f_t
 
-    def polyLeastSquares(sig_t, Fs, order=6):
+    """def polyLeastSquares(sig_t, Fs, order=6):
         T = len(sig_t)/Fs
         t = np.linspace(-T/2, T/2, len(sig_t))
         f_t = Derivative(sig_t, Fs)
         
         # Decimate to 1000 points
-        dFactor = len(sig_t)/1000
+        dFactor = np.intc(len(sig_t)/1000)
 
         # Resample time series to improve the fitting result.
         fFit = signal.decimate(f_t, dFactor, ftype='iir', zero_phase=True)
@@ -445,7 +517,7 @@ def instFreq(sig_t, Fs, method='derivative', *args, **kwargs):
                 
         LsPoly = np.polyfit(timeFit, fFit, order)
         f_t = poly.polyval(t, LsPoly)
-        return f_t
+        return f_t"""
     
     def polyMle(sig_t, Fs, order, *args, **kwargs):
         """
