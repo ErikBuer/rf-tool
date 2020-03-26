@@ -451,6 +451,7 @@ def instFreq(sig_t, Fs, method='derivative', *args, **kwargs):
         'BarnesTwo' is Barnes "two-point filter approximation".
         'BarnesThree' is the Barnes "three-point filter approximation".
         'Claerbouts' is the Claerbouts approximation.
+        'maxDHHT' is a numerical maximum likelihood method on the Discretized Hilbert spectrum.
         'polyLeastSquares' uses a method of phase polynomial with a least squares coefficient estimation. 
         'polyMle' uses a method of phase polynomial with a maxumum likelihood coefficient estimation.
 
@@ -501,6 +502,16 @@ def instFreq(sig_t, Fs, method='derivative', *args, **kwargs):
         c = np.multiply(x[:-1], x[1:])
         d = np.multiply(y[:-1], y[1:])
         f_t = 2/(np.pi*T)*( np.divide(np.subtract(a, b), np.add(np.power(c,2), np.power(d,2))) )
+        return f_t
+
+    def maxDHHT(sig_t, Fs):
+        HH = HilberHuang(np.real(sig_t), Fs)
+        f, t, spectrumMat = HH.discreteMatrix(frequencyBins=256)
+
+        f_t = np.empty(len(sig_t))
+
+        for n, column in enumerate(spectrumMat.T):
+            f_t[n] = f[np.argmax(column)]
         return f_t
 
     """def polyLeastSquares(sig_t, Fs, order=6):
@@ -617,6 +628,8 @@ def instFreq(sig_t, Fs, method='derivative', *args, **kwargs):
         f_t = BarnesThree(sig_t, Fs)
     elif method=='Claerbouts':
         f_t = Claerbouts(sig_t, Fs)
+    elif method=='maxDHHT':
+        f_t = maxDHHT(sig_t, Fs)
     elif method=='polyLeastSquares':
         order = kwargs.get('order', 6)
         f_t = polyLeastSquares(sig_t, Fs=Fs, order=order)
