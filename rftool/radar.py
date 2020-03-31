@@ -16,7 +16,6 @@ from pyhht import EMD                       # Hilbert-Huang TF analysis
 import rftool.utility as util
 import rftool.estimation as estimate
 
-
 def Albersheim( Pfa, Pd, N ):
     """
     Calculate required SNR for non-coherent integration over N pulses, by use of Albersheims equation.

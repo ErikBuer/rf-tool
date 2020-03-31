@@ -3,8 +3,10 @@ import scipy.optimize as optimize
 import scipy.integrate as integrate
 import scipy.special as special
 import scipy.ndimage as ndimage
+import scipy.misc as sciMisc
 import numpy as np
 import numpy.polynomial.polynomial as poly
+import tftb as tftb
 
 from mpl_toolkits.mplot3d import axes3d     # 3D plot
 import matplotlib.pyplot as plt
@@ -92,6 +94,8 @@ class HilberHuang:
             for n, fBin in enumerate(row):
                 if fBin<0:
                     fBin = -fBin
+                if frequencyBins-1<fBin:
+                    fBin = frequencyBins-1
                 spectrumMat[fBin,n] += self.intensity[m,n]
 
         return f, self.t, spectrumMat
@@ -102,6 +106,7 @@ class HilberHuang:
         The plot neglects negative frequencies.
 
         frequencyBins is the number of discrete bins from 0 Hz to Fs/2
+        decimateTime decimates along the time axis to reduce the image size. Input Decimation factor.
         includeRes defines whether the residu is included in the spectrum.
 
         Returns a figure with the sum energy in each time-frequnecy bin.
@@ -110,11 +115,17 @@ class HilberHuang:
         - S.E. Hamdi et al., Hilbert-Huang Transform versus Fourier based analysis for diffused ultrasonic waves structural health monitoring in polymer based composite materials, Proceedings of the Acoustics 2012 Nantes Conference.
         """
         includeRes = kwargs.get('includeRes', False)
-        filterSize = kwargs.get('filterSize', 1)
+        decimateTime = kwargs.get('decimateTime', False)
+        filterSigma = kwargs.get('filterSigma', 0)
 
         # Get discrete matrix
         f, t, spectrumMat = self.discreteMatrix( frequencyBins=frequencyBins, includeRes=includeRes)
 
+        # Decimate the time axis to a manageble length
+        if decimateTime != False:
+            spectrumMat = signal.decimate(spectrumMat, q=decimateTime, axis=1)
+            t = np.linspace(t[0], t[-1], spectrumMat.shape[1])
+        # Smooth the image for better intuision. 
         if 0<filterSigma:
             spectrumMat = ndimage.gaussian_filter(spectrumMat, sigma=filterSigma, mode='reflect')
 
@@ -382,6 +393,13 @@ def instFreq(sig_t, Fs, method='derivative', *args, **kwargs):
         f_t = 2/(np.pi*T)*( np.divide(np.subtract(a, b), np.add(np.power(c,2), np.power(d,2))) )
         return f_t
 
+    def maxWVT(sig_t, Fs):
+        tfr = tftb.processing.WignerVilleDistribution(sig_t)
+        timeFreqMat, t, f = tfr.run()
+        #tfr.plot(kind='contour', show_tf=True)
+        f_t = Fs*f[np.argmax(timeFreqMat,0)]
+        return f_t
+
     def maxDHHT(sig_t, Fs):
         HH = HilberHuang(np.real(sig_t), Fs)
         f, t, spectrumMat = HH.discreteMatrix(frequencyBins=256)
@@ -408,8 +426,6 @@ def instFreq(sig_t, Fs, method='derivative', *args, **kwargs):
         f_t = poly.polyval(t, LsPoly)
         return f_t
 
-        
-    
     def polyMle(sig_t, Fs, order, *args, **kwargs):
         """
         Estimate the instantaneous frequency through the use of a polynimial phase function and MLE coefficient estimation.
@@ -508,6 +524,8 @@ def instFreq(sig_t, Fs, method='derivative', *args, **kwargs):
         f_t = BarnesThree(sig_t, Fs)
     elif method=='Claerbouts':
         f_t = Claerbouts(sig_t, Fs)
+    elif method=='maxWVT':
+        f_t = maxWVT(sig_t, Fs)
     elif method=='maxDHHT':
         f_t = maxDHHT(sig_t, Fs)
     elif method=='polyLeastSquares':
