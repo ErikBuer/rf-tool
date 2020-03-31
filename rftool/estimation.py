@@ -129,7 +129,7 @@ class HilberHuang:
         if 0<filterSigma:
             spectrumMat = ndimage.gaussian_filter(spectrumMat, sigma=filterSigma, mode='reflect')
 
-        fig = plt.figure(figsize=(10, 3))
+        fig = plt.figure(figsize=(20, 6))
         ax = fig.add_subplot(111)
         cset = ax.pcolormesh(t, f, spectrumMat, cmap=colorMap)
         plt.colorbar(cset, ax=ax)
@@ -367,6 +367,7 @@ def instFreq(sig_t, Fs, method='derivative', *args, **kwargs):
         c = np.multiply(x[:-1], x[1:])
         d = np.multiply(y[:-1], y[1:])
         f_t = 1/(2*np.pi*T)*np.arctan( np.divide(np.subtract(a, b), np.add(c, d)) )
+        f_t.append(f_t[-1])
         return f_t
 
     def BarnesThree(sig_t, Fs):
@@ -393,7 +394,7 @@ def instFreq(sig_t, Fs, method='derivative', *args, **kwargs):
         f_t = 2/(np.pi*T)*( np.divide(np.subtract(a, b), np.add(np.power(c,2), np.power(d,2))) )
         return f_t
 
-    def maxWVT(sig_t, Fs):
+    def maxWVD(sig_t, Fs):
         tfr = tftb.processing.WignerVilleDistribution(sig_t)
         timeFreqMat, t, f = tfr.run()
         #tfr.plot(kind='contour', show_tf=True)
@@ -524,8 +525,8 @@ def instFreq(sig_t, Fs, method='derivative', *args, **kwargs):
         f_t = BarnesThree(sig_t, Fs)
     elif method=='Claerbouts':
         f_t = Claerbouts(sig_t, Fs)
-    elif method=='maxWVT':
-        f_t = maxWVT(sig_t, Fs)
+    elif method=='maxWVD':
+        f_t = maxWVD(sig_t, Fs)
     elif method=='maxDHHT':
         f_t = maxDHHT(sig_t, Fs)
     elif method=='polyLeastSquares':
