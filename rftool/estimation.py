@@ -367,7 +367,7 @@ def instFreq(sig_t, Fs, method='derivative', *args, **kwargs):
         c = np.multiply(x[:-1], x[1:])
         d = np.multiply(y[:-1], y[1:])
         f_t = 1/(2*np.pi*T)*np.arctan( np.divide(np.subtract(a, b), np.add(c, d)) )
-        f_t.append(f_t[-1])
+        f_t = np.append(f_t, f_t[-1])
         return f_t
 
     def BarnesThree(sig_t, Fs):
@@ -684,5 +684,54 @@ def cyclicEstimator( SCD, f, alpha, bandLimited=True ):
         fCenter = None
         alphaAverage = np.sum(SCD, 0)
 
-    R_symb = f0MLE(alphaAverage, alpha, 5) #! Debug, restet to 6
+    R_symb = f0MLE(alphaAverage, alpha, 5)
     return fCenter, R_symb
+
+
+def inspectPackage( sig_t, Fs, T ):
+    """
+    Estimate the number of unique symbols (pulses) in a packet
+
+    sig_t is the extracted packet in time domain
+    Fs  is the sampling frequency [Hz]
+    T is the symbol periond [s]
+    
+    Returns:
+    packet as a vector of symbols. Symbols are numbered as they appear in the signal.
+    symbolAlpahebt, a vector of the time domain symbols.
+    """
+
+    # Divide signal into symbols
+    sampPerSymb = np.intc(T*Fs)
+    
+    # TODO: Align packet based on first symbol
+    remainder = len(sig_t) % sampPerSymb
+    if 0<remainder:
+        sig_t = np.append(sig_t, np.zeros(remainder)) 
+    nSymbols = np.intc(len(sig_t)/sampPerSymb)
+
+    sigMat = sig_t.reshape((nSymbols,sampPerSymb))
+    sigMat = sigMat.T
+
+
+    # Create classification matrix
+    classificationMat = np.zeros((nSymbols, nSymbols))
+
+    it = np.nditer(classificationMat, flags=['multi_index'])
+    while not it.finished:
+        classificationMat[it.multi_index] = np.max( signal.correlate( sigMat[:,it.multi_index[0]], sigMat[:,it.multi_index[1]] , mode='same', method='fft') )
+        """plt.figure()
+        plt.plot(np.abs(signal.correlate( sig_t[it.multi_index[0],:], sig_t[it.multi_index[1],:] , method='fft')))
+        plt.show()"""
+        it.iternext()
+
+    plt.figure()
+    plt.pcolormesh(classificationMat, cmap=colorMap)
+    plt.colorbar()
+    plt.show()
+
+    #return packet, symbolAlphabet
+
+    # TODO: PLot matrix in report
+    # TODO: Make eddicient algo.
+    

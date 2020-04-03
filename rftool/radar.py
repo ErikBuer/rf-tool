@@ -385,5 +385,4 @@ class chirp:
                 waveform[m*self.points:(m+1)*self.points] = sig
             elif bit==0:
                 waveform[m*self.points:(m+1)*self.points] = sigInv
-
         return waveform
