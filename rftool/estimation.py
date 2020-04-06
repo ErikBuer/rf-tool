@@ -688,7 +688,7 @@ def cyclicEstimator( SCD, f, alpha, bandLimited=True ):
     return fCenter, R_symb
 
 
-def inspectPackage( sig_t, Fs, T ):
+def inspectPackage( sig_t, Fs, T, **kwargs ):
     """
     Estimate the number of unique symbols (pulses) in a packet
 
@@ -700,6 +700,7 @@ def inspectPackage( sig_t, Fs, T ):
     packet as a vector of symbols. Symbols are numbered as they appear in the signal.
     symbolAlpahebt, a vector of the time domain symbols.
     """
+    threshold = kwargs.get('threshold', 0.75)
 
     # Divide signal into symbols
     sampPerSymb = np.intc(T*Fs)
@@ -713,42 +714,42 @@ def inspectPackage( sig_t, Fs, T ):
     sigMat = sig_t.reshape((nSymbols,sampPerSymb))
     sigMat = sigMat.T
 
-
-    # Create classification matrix
-    classificationMat = np.zeros((nSymbols, nSymbols))
-
-    it = np.nditer(classificationMat, flags=['multi_index'])
-    while not it.finished:
-        classificationMat[it.multi_index] = np.max( signal.correlate( sigMat[:,it.multi_index[0]], sigMat[:,it.multi_index[1]] , mode='same', method='fft') )
-        it.iternext()
-
-    maxCorr = np.zeros(nSymbols)
+    # Correlate the first symbol with all other 
     extractionCount = np.ones(nSymbols)
-
-    classificationMatTemp = np.copy(classificationMat)
-    for index, row in enumerate(classificationMatTemp):
-        row[index] = 0
-        maxCorr[index] = np.argmax(row) 
-
-
     packet = np.zeros(nSymbols)
-    nSymbols=np.intc(0)
-    for index, item in enumerate(maxCorr):
-        if index<item:
-            packet[index] = nSymbols
-            nSymbols+=1
-        else:
-            packet[index] = packet[np.intc(item)]
 
-    print(packet)
+    iterator = 0
+    symbolCount = 0
+    while np.sum(extractionCount)!=0:
+        if extractionCount[iterator]==1:
+            correlationVector = np.zeros(nSymbols)
+            for index, item in enumerate(extractionCount):
+                if (item==1) & (index!=iterator):
+                    correlationVector[index] = np.max( np.abs(signal.correlate( sigMat[:,iterator], sigMat[:,index] , mode='same', method='fft')) )
+            
+            correlationVector = np.greater( correlationVector, np.max(correlationVector)*threshold )
+            correlationVector[iterator] = True
 
-    plt.figure()
-    plt.pcolormesh(classificationMat, cmap=colorMap)
-    plt.colorbar()
-    plt.tight_layout()
+            for index, item in enumerate(correlationVector):
+                if item==True:
+                    packet[index] = symbolCount
+                    extractionCount[index] = 0
 
-    #return packet, symbolAlphabet
+            symbolCount += 1
+        iterator += 1
 
-    # TODO: PLot matrix in report
-    # TODO: Make eddicient algo.
+    # Output matrix
+    symbolAlphabet = np.zeros((sampPerSymb,symbolCount), dtype=complex)
+    for symbol in range(0,symbolCount):
+        symbNumb = 0
+        # Average the symbols
+        for index, item in enumerate(packet):
+            if item == symbNumb:
+                symbolAlphabet[:,symbol] += sigMat[:,index]
+                symbNumb += 1
+
+        # Normalize power
+        symbolAlphabet[:,symbol] = symbolAlphabet[:,symbol]/symbNumb
+
+    return packet, symbolAlphabet
     
