@@ -720,15 +720,32 @@ def inspectPackage( sig_t, Fs, T ):
     it = np.nditer(classificationMat, flags=['multi_index'])
     while not it.finished:
         classificationMat[it.multi_index] = np.max( signal.correlate( sigMat[:,it.multi_index[0]], sigMat[:,it.multi_index[1]] , mode='same', method='fft') )
-        """plt.figure()
-        plt.plot(np.abs(signal.correlate( sig_t[it.multi_index[0],:], sig_t[it.multi_index[1],:] , method='fft')))
-        plt.show()"""
         it.iternext()
+
+    maxCorr = np.zeros(nSymbols)
+    extractionCount = np.ones(nSymbols)
+
+    classificationMatTemp = np.copy(classificationMat)
+    for index, row in enumerate(classificationMatTemp):
+        row[index] = 0
+        maxCorr[index] = np.argmax(row) 
+
+
+    packet = np.zeros(nSymbols)
+    nSymbols=np.intc(0)
+    for index, item in enumerate(maxCorr):
+        if index<item:
+            packet[index] = nSymbols
+            nSymbols+=1
+        else:
+            packet[index] = packet[np.intc(item)]
+
+    print(packet)
 
     plt.figure()
     plt.pcolormesh(classificationMat, cmap=colorMap)
     plt.colorbar()
-    plt.show()
+    plt.tight_layout()
 
     #return packet, symbolAlphabet
 
