@@ -530,10 +530,10 @@ def instFreq(sig_t, Fs, method='derivative', *args, **kwargs):
     elif method=='maxDHHT':
         f_t = maxDHHT(sig_t, Fs)
     elif method=='polyLeastSquares':
-        order = kwargs.get('order', 6)
+        order = kwargs.get('order', 4)
         f_t = polyLeastSquares(sig_t, Fs=Fs, order=order)
     elif method=='polyMle':
-        order = kwargs.get('order', 6)
+        order = kwargs.get('order', 4)
         windowSize = kwargs.get('windowSize', None)
         f_t = polyMle(sig_t, Fs=Fs, order=order, windowSize=windowSize)
     return f_t
@@ -716,7 +716,7 @@ def inspectPackage( sig_t, Fs, T, **kwargs ):
 
     # Correlate the first symbol with all other 
     extractionCount = np.ones(nSymbols)
-    packet = np.zeros(nSymbols)
+    packet = np.zeros(nSymbols, dtype=int)
 
     iterator = 0
     symbolCount = 0
@@ -724,15 +724,15 @@ def inspectPackage( sig_t, Fs, T, **kwargs ):
         if extractionCount[iterator]==1:
             correlationVector = np.zeros(nSymbols)
             for index, item in enumerate(extractionCount):
-                if (item==1) & (index!=iterator):
+                if (item==1):
                     correlationVector[index] = np.max( np.abs(signal.correlate( sigMat[:,iterator], sigMat[:,index] , mode='same', method='fft')) )
             
-            correlationVector = np.greater( correlationVector, np.max(correlationVector)*threshold )
+            correlationVector = np.greater( correlationVector, correlationVector[iterator]*threshold )  # Compare with autocorrelation
             correlationVector[iterator] = True
 
             for index, item in enumerate(correlationVector):
                 if item==True:
-                    packet[index] = symbolCount
+                    packet[index] = np.intc(symbolCount)
                     extractionCount[index] = 0
 
             symbolCount += 1
@@ -740,13 +740,14 @@ def inspectPackage( sig_t, Fs, T, **kwargs ):
 
     # Output matrix
     symbolAlphabet = np.zeros((sampPerSymb,symbolCount), dtype=complex)
+    symbNumb = 0
     for symbol in range(0,symbolCount):
-        symbNumb = 0
         # Average the symbols
         for index, item in enumerate(packet):
             if item == symbNumb:
                 symbolAlphabet[:,symbol] += sigMat[:,index]
-                symbNumb += 1
+        symbNumb += 1
+
 
         # Normalize power
         symbolAlphabet[:,symbol] = symbolAlphabet[:,symbol]/symbNumb
