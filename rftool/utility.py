@@ -9,11 +9,18 @@ def Gamma2VSWR( Gamma ):
     """
     return np.divide(1+abs(Gamma), 1-abs(Gamma))
 
+def pow2normdb( mag ):
+    """
+    Conversion between linear magnitude (voltage etc.) normalized logaithmic decibel scale
+    """
+    vec = 10*np.log10( mag )
+    return 10*np.log10( mag )-np.max(10*np.log10( mag ))
+
 def mag2db( mag ):
     """
     Conversion between linear magnitude (voltage etc.) and logaithmic decibel scale
     """
-    return 20*np.log10( mag)
+    return 20*np.log10( mag )
 
 def db2mag( dB ):
     """

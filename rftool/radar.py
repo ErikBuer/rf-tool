@@ -144,6 +144,7 @@ def ACF(x, plot = True, *args, **kwargs):
     return r_xx
 
 
+
 class chirp:
     """
     Object for generating linear and non-linear chirp generation.
