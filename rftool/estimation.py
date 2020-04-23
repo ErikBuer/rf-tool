@@ -10,8 +10,6 @@ import tftb as tftb
 
 from mpl_toolkits.mplot3d import axes3d     # 3D plot
 import matplotlib.pyplot as plt
-from matplotlib import cm
-colorMap = cm.coolwarm
 
 from pyhht.visualization import plot_imfs   # Hilbert-Huang TF analysis
 from pyhht import EMD                       # Hilbert-Huang TF analysis
@@ -128,13 +126,13 @@ class HilberHuang:
         # Smooth the image for better intuision. 
         if 0<filterSigma:
             spectrumMat = ndimage.gaussian_filter(spectrumMat, sigma=filterSigma, mode='reflect')
-
-        fig = plt.figure(figsize=(20, 6))
+        
+        fig = plt.figure()
         ax = fig.add_subplot(111)
-        cset = ax.pcolormesh(t, f, spectrumMat, cmap=colorMap)
+        cset = ax.pcolormesh(t, f, spectrumMat )
         plt.colorbar(cset, ax=ax)
 
-        ax.set_title("Hilbert Spectrum")
+        #ax.set_title("Hilbert Spectrum")
         ax.set_xlabel('t [s]')
         ax.set_ylabel('f [Hz]')
         ax.set_ylim(0,np.divide(self.Fs,2))
@@ -157,7 +155,7 @@ class HilberHuang:
 
         # Calculate Hilbert spectrum
 
-        fig = plt.figure(figsize=(10, 3))
+        fig = plt.figure()
         ax = fig.add_subplot(111)
         cset = None
         for i in range(np.size(instFreq,0)):
@@ -224,7 +222,7 @@ def FAM(x, *args, **kwargs):
             xMat[:,p] = np.fft.fft(xMat[:,p])
             # Correct phase
             nVec = np.array(range(1, N_Prime+1))
-            xMat[:,p] = np.multiply(xMat[:,p],np.exp(np.multiply(-1j*2*np.pi*(p+1),nVec)/N_Prime))  # TODO, add alpha term
+            xMat[:,p] = np.multiply(xMat[:,p],np.exp(np.multiply(-1j*2*np.pi*(p+1),nVec)/N_Prime))
 
     # Mix Channelized Subblocks (Self mix)
     SCD = np.empty_like(xMat, dtype=complex)
@@ -266,37 +264,88 @@ def FAM(x, *args, **kwargs):
         else:
             SCDplt = SCD
 
-        plt.pcolormesh(alpha_i, f_j, SCDplt, cmap=colorMap)
+        plt.pcolormesh(alpha_i, f_j, SCDplt)
         plt.title("Spectral Correlation Density")
         plt.xlabel("alpha [Hz]")
         plt.ylabel("f [Hz]")
         plt.colorbar()
 
-        # Plot phase
+        """# Plot phase
         plt.figure()
-        plt.pcolormesh(alpha_i, f_j, angSCD, cmap=colorMap)
+        plt.pcolormesh(alpha_i, f_j, angSCD)
         plt.title("Spectral Correlation Density (Phase)")
         plt.xlabel("alpha [Hz]")
         plt.ylabel("f [Hz]")
-        plt.colorbar()
+        plt.colorbar()"""
         
         # Plot Correlation Density as Surf
-        """
-        fig = plt.figure()
+        
+        """fig = plt.figure()
         ax = fig.gca(projection='3d')
         #ax.set_zlim3d(0, np.max(SCD))
         Alpha_i, F_j = np.meshgrid(alpha_i, f_j)
 
-        surf = ax.plot_surface(Alpha_i, F_j, SCDplt, cmap=colorMap, linewidth=0, antialiased=False)
+        surf = ax.plot_surface(Alpha_i, F_j, SCDplt, linewidth=0, antialiased=False)
         
         # Add a color bar which maps values to colors.
         fig.colorbar(surf) #, shrink=0.5, aspect=5)
         plt.title("Spectral Correlation Density")
         plt.xlabel("alpha [Hz]")
         plt.ylabel("f [Hz]")
-        """
-
+        plt.show"""
     return SCD, f_j, alpha_i
+
+def cyclicEstimator( SCD, f, alpha, bandLimited=True ):
+    """
+    Estimates center frequency and symbol rate from a Spectral Correlation Density.
+    SCD is an m,n matrix of the Spectral Correlation Density (complex).
+    f is a frequency vector of length m.
+    alpha is a cyclic frequency vector of length n.
+    bandLimited. When set to True, the symbol tate estimator only utilizes the 1 dB bw for estimation. Estimator relies on a >1 dB inband SNR.
+
+    returns estimated center frequency and symbol rate.
+    """
+    # Find row for alpha=0
+    alpha0Index = np.argmin(np.abs(alpha))
+    deltaAlpha = (alpha[-1]-alpha[0])/(len(alpha)-1)
+    # Estimate IF by use of maximum likelyhood estimation.
+    # Multiply alpha dimension with triangle vector for improved center frequency estimation.
+    triangleAlpha = signal.triang(len(alpha)) # Triangle window of length len(alpha).
+    window = np.multiply(np.ones(len(alpha)), triangleAlpha)
+    window[alpha0Index-2:alpha0Index+2] = 0
+    window = window / np.sum(window)
+
+    #! Debug code
+    """fig, ax = plt.subplots()
+    ax.plot(alpha, window)
+    ax.set_xlabel('alpha [Hz]')
+    ax.set_ylabel('Weighting')
+    plt.tight_layout()
+    imagePath = '../figures/'
+    fileName = 'alphaWindow' # str(m_analysis.iterations)
+    plt.savefig(imagePath + fileName + '.png', bbox_inches='tight')
+    plt.savefig(imagePath + fileName + '.pgf', bbox_inches='tight')
+    plt.show()"""
+    #! Debug code
+    
+    freqEstVetctor = np.dot(window, np.abs(SCD.T))       # Utilize the cyclic dimension for frequency estimation.
+    triLen = len(f)/30
+    triangleF = signal.triang(np.intc(triLen))/triLen # Triangle window of length len(f).
+    filteredFreqEstVetctor = signal.fftconvolve(freqEstVetctor, triangleF, mode='same')
+
+    # Estimate symbol rate through maximization of pulse train correlation
+    if bandLimited == True:
+        # Estimate signal bandwidth
+        fCenter, bw, fUpper, fLower, fCenterIndex, fUpperIndex, fLowerIndex = bandwidthEstimator(util.pow2db(filteredFreqEstVetctor), f, 2)
+        bandWindow = np.ones(fUpperIndex-fLowerIndex)
+        alphaAverage = np.dot(np.abs(SCD[fLowerIndex:fUpperIndex, :].T), bandWindow)
+    else:
+        fCenter = None
+        alphaAverage = np.sum(SCD, 0)
+
+    R_symb = f0MLE(alphaAverage, alpha, 5)
+    return fCenter, R_symb
+
 
 def f0MLE(psd, f, peaks):
     """
@@ -605,16 +654,26 @@ def fftQuadraticInterpolation(X_f, f):
     #Quadratic fit around argmax and neighboring bins
     [a0, a1, a2] = np.polynomial.polynomial.polyfit(f[k-1:k+2], mag[k-1:k+2], 2)
 
-    """
-    #! Debug code
-    plt.figure()
-    plt.stem(f[k-1:k+2], mag[k-1:k+2])
-    polyFreq = np.linspace(f[k-1], f[k+1], 11)
+    
+    """#! Debug code
+    fig, ax = plt.subplots()
+    ax.stem(f[k-1:k+2], mag[k-1:k+2], label='$|Z(f)|$')
+    polyFreq = np.linspace(f[k-1], f[k+1], 30)
     polyCurve = np.polynomial.polynomial.polyval(polyFreq, [a0, a1, a2])
-    plt.plot( polyFreq, polyCurve )
+    ax.plot( polyFreq, polyCurve, color='#81a4fa', label='Polynomial fit')
+    ax.set_ylim(np.min(polyCurve)-((np.max(polyCurve)-np.min(polyCurve))/5), np.max(polyCurve)+((np.max(polyCurve)-np.min(polyCurve))/5))
+    ax.set_xlim(polyFreq[0]-np.abs((polyFreq[-1]-polyFreq[0])/10), polyFreq[-1]+np.abs((polyFreq[-1]-polyFreq[0])/10))
+    ax.set_xlabel('f [Hz]')
+    ax.set_ylabel('Magnitude')
+    plt.legend()
+    plt.tight_layout()
+    imagePath = '../figures/'
+    fileName = 'polyMleIllustration' # str(m_analysis.iterations)
+    plt.savefig(imagePath + fileName + '.png', bbox_inches='tight')
+    plt.savefig(imagePath + fileName + '.pgf', bbox_inches='tight')
     plt.show()
-    #! End debug code
-    """
+    #! End debug code"""
+    
 
     # Fint Maximum
     fQuad = -a1/(2*a2)
@@ -648,44 +707,6 @@ def bandwidthEstimator(psd, f, threshold):
     fLower = f[fLowerIndex]
     bw = fUpper - fLower
     return fCenter, bw, fUpper, fLower, fCenterIndex, fUpperIndex, fLowerIndex
-
-
-def cyclicEstimator( SCD, f, alpha, bandLimited=True ):
-    """
-    Estimates center frequency and symbol rate from a Spectral Correlation Density.
-    SCD is an m,n matrix of the Spectral Correlation Density (complex).
-    f is a frequency vector of length m.
-    alpha is a cyclic frequency vector of length n.
-    bandLimited. When set to True, the symbol tate estimator only utilizes the 1 dB bw for estimation. Estimator relies on a >1 dB inband SNR.
-
-    returns estimated center frequency and symbol rate.
-    """
-    # Find row for alpha=0
-    alpha0Index = np.argmin(np.abs(alpha))
-    deltaAlpha = (alpha[-1]-alpha[0])/(len(alpha)-1)
-    # Estimate IF by use of maximum likelyhood estimation.
-    # Multiply alpha dimension with triangle vector for improved center frequency estimation.
-    triangleAlpha = signal.triang(len(alpha)) # Triangle window of length len(alpha).
-    window = np.multiply(np.ones(len(alpha)), triangleAlpha)
-    window[alpha0Index-2:alpha0Index+2] = 0
-    window = window / np.sum(window)
-    freqEstVetctor = np.dot(window, np.abs(SCD.T))       # Utilize the cyclic dimension for frequency estimation.
-    triLen = len(f)/30
-    triangleF = signal.triang(np.intc(triLen))/triLen # Triangle window of length len(f).
-    filteredFreqEstVetctor = signal.fftconvolve(freqEstVetctor, triangleF, mode='same') # TODO Check if there are zero-values in freqEstVetctor prior to the filtering.
-
-    # Estimate symbol rate through maximization of pulse train correlation
-    if bandLimited == True:
-        # Estimate signal bandwidth
-        fCenter, bw, fUpper, fLower, fCenterIndex, fUpperIndex, fLowerIndex = bandwidthEstimator(util.pow2db(filteredFreqEstVetctor), f, 2)
-        bandWindow = np.ones(fUpperIndex-fLowerIndex)
-        alphaAverage = np.dot(np.abs(SCD[fLowerIndex:fUpperIndex, :].T), bandWindow)
-    else:
-        fCenter = None
-        alphaAverage = np.sum(SCD, 0)
-
-    R_symb = f0MLE(alphaAverage, alpha, 5)
-    return fCenter, R_symb
 
 
 def inspectPackage( sig_t, Fs, T, **kwargs ):

@@ -8,8 +8,6 @@ import numpy.polynomial.polynomial as poly
 
 from mpl_toolkits.mplot3d import axes3d     # 3D plot
 import matplotlib.pyplot as plt
-from matplotlib import cm
-colorMap = cm.coolwarm
 
 from pyhht.visualization import plot_imfs   # Hilbert-Huang TF analysis
 from pyhht import EMD                       # Hilbert-Huang TF analysis
@@ -128,7 +126,7 @@ def ACF(x, plot = True, *args, **kwargs):
         
     if plot == True:
         # Plot
-        plt.figure(figsize=(10, 3))
+        plt.figure()
         
         for i, column in enumerate(r_xx.T):
             # Normalize
@@ -139,7 +137,7 @@ def ACF(x, plot = True, *args, **kwargs):
         plt.legend()
         plt.ylim([yMin, 0])
         plt.title("Autocorrelation Function")
-        plt.ylabel("Normalized magnitude [dB]")
+        plt.ylabel("Normalized Magnitude [dB]")
         plt.tight_layout()
     return r_xx
 
@@ -211,7 +209,7 @@ class chirp:
             omega_t = np.gradient(self.phi_t, self.t)
 
         if plot == True:
-            plt.figure(figsize=(10, 3))
+            plt.figure()
             plt.plot(self.t, omega_t)
             plt.plot(self.t, self.targetOmega_t)
             plt.xlabel('t [s]')
@@ -234,7 +232,7 @@ class chirp:
             gamma_t = np.gradient(self.getInstFreq(plot=False), self.t)
 
         if plot == True:
-            plt.figure(figsize=(10, 3))
+            plt.figure()
             plt.plot(self.t, gamma_t)
             plt.xlabel('t [s]')
             plt.ylabel('f [Hz]')
