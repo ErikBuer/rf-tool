@@ -295,7 +295,7 @@ def FAM(x, *args, **kwargs):
         plt.show"""
     return SCD, f_j, alpha_i
 
-def cyclicEstimator( SCD, f, alpha, bandLimited=True ):
+def cyclicEstimator( SCD, f, alpha, bandLimited=True, **kwargs):
     """
     Estimates center frequency and symbol rate from a Spectral Correlation Density.
     SCD is an m,n matrix of the Spectral Correlation Density (complex).
@@ -305,38 +305,58 @@ def cyclicEstimator( SCD, f, alpha, bandLimited=True ):
 
     returns estimated center frequency and symbol rate.
     """
+
     # Find row for alpha=0
     alpha0Index = np.argmin(np.abs(alpha))
     deltaAlpha = (alpha[-1]-alpha[0])/(len(alpha)-1)
+    deltaFreq = (f[-1]-f[0])/(len(f)-1)
     # Estimate IF by use of maximum likelyhood estimation.
     # Multiply alpha dimension with triangle vector for improved center frequency estimation.
     triangleAlpha = signal.triang(len(alpha)) # Triangle window of length len(alpha).
-    window = np.multiply(np.ones(len(alpha)), triangleAlpha)
-    window[alpha0Index-2:alpha0Index+2] = 0
-    window = window / np.sum(window)
+    alphaWindow = np.multiply(np.ones(len(alpha)), triangleAlpha) # Triangular window
+    #alphaWindow = np.ones(len(alpha)) Rectangular window
+    alphaWindow[alpha0Index-2:alpha0Index+2] = 0
+    alphaWindow = alphaWindow / np.sum(alphaWindow)
+    alphaWindow = kwargs.get('alphaWindow', alphaWindow)
 
     #! Debug code
     """fig, ax = plt.subplots()
     ax.plot(alpha, window)
     ax.set_xlabel('alpha [Hz]')
     ax.set_ylabel('Weighting')
+    ax.ticklabel_format(useMathText=True, scilimits=(0,3))
     plt.tight_layout()
-    imagePath = '../figures/'
+    imagePath = '../figures/cycloDemo/'
     fileName = 'alphaWindow' # str(m_analysis.iterations)
     plt.savefig(imagePath + fileName + '.png', bbox_inches='tight')
     plt.savefig(imagePath + fileName + '.pgf', bbox_inches='tight')
     plt.show()"""
     #! Debug code
     
-    freqEstVetctor = np.dot(window, np.abs(SCD.T))       # Utilize the cyclic dimension for frequency estimation.
-    triLen = len(f)/30
-    triangleF = signal.triang(np.intc(triLen))/triLen # Triangle window of length len(f).
-    filteredFreqEstVetctor = signal.fftconvolve(freqEstVetctor, triangleF, mode='same')
+    freqEstVetctor = np.dot(alphaWindow, np.abs(SCD.T)) # Utilize the cyclic dimension for frequency estimation.
+    fWindow = kwargs.get('fWindow', np.array([1]))
 
-    # Estimate symbol rate through maximization of pulse train correlation
+    # Allow parametric window creation.
+    if isinstance(fWindow, str):
+        # The width of the window in Hertz.
+        winLenHertz = kwargs.get('fWindowWidthHertz', 50)
+        winLen = np.intc(np.ceil(winLenHertz/deltaFreq))
+        if fWindow=='triangle':
+            fWindow = signal.triang(np.intc(winLen))#/winLen # Triangle window of length len(f).
+        elif fWindow=='rectangle':
+            # create rectangular window.
+            fWindow = np.ones(winLen)
+        # Filter along frequency axis.
+        freqEstVetctor = signal.fftconvolve(freqEstVetctor, fWindow, mode='same')
+    # If no filtering is intended.
+    elif len(fWindow)!=1:
+        # Filter along frequency axis.
+        freqEstVetctor = signal.fftconvolve(freqEstVetctor, fWindow, mode='same')
+
+    # Estimate symbol rate through maximization of pulse train correlation.
     if bandLimited == True:
-        # Estimate signal bandwidth
-        fCenter, bw, fUpper, fLower, fCenterIndex, fUpperIndex, fLowerIndex = bandwidthEstimator(util.pow2db(filteredFreqEstVetctor), f, 2)
+        # Estimate signal bandwidth.
+        fCenter, bw, fUpper, fLower, fCenterIndex, fUpperIndex, fLowerIndex = bandwidthEstimator(util.pow2db(freqEstVetctor), f, 2)
         bandWindow = np.ones(fUpperIndex-fLowerIndex)
         alphaAverage = np.dot(np.abs(SCD[fLowerIndex:fUpperIndex, :].T), bandWindow)
     else:
@@ -588,7 +608,7 @@ def instFreq(sig_t, Fs, method='derivative', *args, **kwargs):
     return f_t
 
 
-def carierFrequencyEstimator(sig_t, Fs, *args, **kwargs):
+def carierFrequencyEstimator( sig_t, Fs, *args, **kwargs ):
     """
     Estimate the carrier frequency of a signal using an autocorrelation method, or a frequency domain maximum likelihood method.
     Autocorrelation method is applicable for sigle carrier signals as ASK, PSK, QAM.
@@ -625,7 +645,7 @@ def carierFrequencyEstimator(sig_t, Fs, *args, **kwargs):
     elif method == 'mle':
         # Select appropriate transform, periodogram or Welch's method
         if nfft<len(sig_t):
-            f, p_xx = signal.welch(sig_t, Fs, nperseg=nfft, return_onesided=True)
+            f, p_xx = signal.welch(sig_t, Fs, nperseg=nfft, return_onesided=False) #! return_onesided=True 
             sig_f = np.sqrt(p_xx)
         else:
             f, sig_f = util.magnitudeSpectrum(sig_t, Fs, nfft=nfft)
@@ -635,7 +655,7 @@ def carierFrequencyEstimator(sig_t, Fs, *args, **kwargs):
 
     return fCenter
 
-def fftQuadraticInterpolation(X_f, f):
+def fftQuadraticInterpolation(X_f, f, **kwargs):
     """
     Estimate the carrier frequency of a signal using quadratic interpolation.
     This function is called from carierFrequencyEstimator.
@@ -681,7 +701,7 @@ def fftQuadraticInterpolation(X_f, f):
     #phase = np.angle(np.exp(-1j*2*np.pi*fQuad*t0)*X_f[k])
     return fQuad, k
 
-def bandwidthEstimator(psd, f, threshold):
+def bandwidthEstimator( psd, f, threshold ):
     """
     Estimate the bandwidth of an incomming signal in the frequency domain.
 

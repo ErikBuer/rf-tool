@@ -134,8 +134,9 @@ class chirp:
             corrmat[it.multi_index] = np.abs(np.dot(self.getSymbolSig(it.multi_index[0]), self.getSymbolSig(it.multi_index[1])) )
             it.iternext()
 
-        corrmat = util.pow2normdb(corrmat)
+        corrmatDb = util.pow2normdb(corrmat)
         plt.figure(figsize=(2.8, 2.1))
         plt.title('Normalized Dot Product [dB]')
-        plt.pcolormesh(corrmat)
+        plt.pcolormesh(corrmatDb)
         plt.colorbar()
+        return corrmatDb
