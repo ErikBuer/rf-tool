@@ -353,42 +353,52 @@ def cyclicEstimator( SCD, f, alpha, bandLimited=True, **kwargs):
         # Filter along frequency axis.
         freqEstVetctor = signal.fftconvolve(freqEstVetctor, fWindow, mode='same')
 
+    # Allow a-priori center frequency and bandwidth
+    fCenter = kwargs.get('fCenterPriori', None)
+    if (fCenter!=None) & (len(fWindow)!=1):
+        fCenterIndex = np.argmin(np.abs(f-fCenter))
+        fLowerIndex = np.intc(np.floor(fCenterIndex-(len(fWindow)/2)))
+        fUpperIndex = np.intc(np.floor(fCenterIndex+(len(fWindow)/2)))
+        alphaAverage = np.dot(np.abs(SCD[fLowerIndex:fUpperIndex, :].T), fWindow)
     # Estimate symbol rate through maximization of pulse train correlation.
-    if bandLimited == True:
+    elif bandLimited == True:
         # Estimate signal bandwidth.
         fCenter, bw, fUpper, fLower, fCenterIndex, fUpperIndex, fLowerIndex = bandwidthEstimator(util.pow2db(freqEstVetctor), f, 2)
         bandWindow = np.ones(fUpperIndex-fLowerIndex)
         alphaAverage = np.dot(np.abs(SCD[fLowerIndex:fUpperIndex, :].T), bandWindow)
     else:
         fCenter = None
-        alphaAverage = np.sum(SCD, 0)
+        alphaAverage = np.sum(np.abs(SCD), 0)
 
-    R_symb = f0MLE(alphaAverage, alpha, 5)
+    # Take number of peaks in estimation as input
+    symRateCyclicPeakNumber = kwargs.get('symRateCyclicPeakNumber', 5)
+    R_symb = f0MLE(alphaAverage, alpha, symRateCyclicPeakNumber)
     return fCenter, R_symb
 
 
-def f0MLE(psd, f, peaks):
+def f0MLE(psd, f, peaks, blankDistance=2, resolution=4):
     """
     Maximum likelihood estimation of the fundamental frequency of a signal with repeating harmonics in the frequiency domain.
+    A frequency domain intrepetation of [1].
 
     PSD is the two-sided frequency domain representation of the signal under observation.
     f is the frequency vector of PSD
     peaks, is the number of harmonic peaks to include in the estimation.
+    resolution is the fractional resolution of the estimate. When resolution=1, then the PSD resolution is the bound.
 
-    - Wise et al., Maximum likelihood pitch estimation, IEEE Transactions on Acoustics, Speech, and Signal Processing, 1976
+    [1] Wise et. al, Maximum likelihood pitch estimation, IEEE Transactions on Acoustics, Speech, and Signal Processing, 1976
     """
 
     # Convert psd to singlesided
     psd = np.add( psd[np.intc(len(psd)/2):np.intc(len(psd)-1)], np.flip(psd[0:np.intc((len(psd)/2)-1)]) )
     f = f[np.intc(len(f)/2):len(f)-1]
 
-
     K = peaks
     k = np.linspace(1, K, K)
 
     fDelta = (f[-1]-f[0])/(len(f)-1)
 
-    f0Vec = np.linspace(10, f[-1]/K, len(f))
+    f0Vec = np.linspace(blankDistance*fDelta, f[-1]/K, np.intc(len(f)*resolution))
 
     lossInv = np.zeros(len(f0Vec))
     for i, f0 in enumerate(f0Vec):
@@ -396,6 +406,73 @@ def f0MLE(psd, f, peaks):
         idx = np.intc(f0Disc*k)
         lossInv[i] = np.sum(psd[idx])
     f0 = f0Vec[np.argmax(lossInv)]
+
+    #! Debug code
+    plt.style.use('masterThesis')
+    fig, ax = plt.subplots()
+    #ax.set_xmargin(0.01)
+    ax.plot(f0Vec, lossInv)
+    ax.set_xlabel('Harmonic Cycle Frequency [Hz]')
+    ax.set_ylabel('Correlation')
+    ax.ticklabel_format(useMathText=True, scilimits=(0,3))
+    plt.tight_layout()
+    imagePath = '../figures/cycloDemo/'
+    fileName = 'cycleLossFreq'
+    plt.savefig(imagePath + fileName + '.png', bbox_inches='tight')
+    plt.savefig(imagePath + fileName + '.pgf', bbox_inches='tight')
+    #! Debug code
+    return f0
+
+def f0MleTime(Rxx, f, peaks, blankDistance=20, resolution=1):
+    """
+    Maximum likelihood estimation of the fundamental frequency of a signal with repeating autocorrelation peaks.
+
+    If mode is 'autocorr':
+    sig (Rxx) is the two-sided ('full') autocorrelation.
+    f is sampling frequency
+    peaks, is the number of harmonic peaks to include in the estimation.
+    Returns the fundamental/cyclic frequency f0
+    blankDistance is the distance from full overlap wchich is to be ignored in the estimation
+
+    [1] Wise et. al, Maximum likelihood pitch estimation, IEEE Transactions on Acoustics, Speech, and Signal Processing, 1976
+    """
+
+    Fs = f
+    dt = (1/Fs)
+    # Singlesided RXX as per the definision in [1]
+    Rxx = Rxx[np.intc(len(Rxx)/2):]
+    t = np.linspace(0, len(Rxx)*dt,len(Rxx))
+
+    K = peaks
+    k = np.linspace(1, K, K)
+
+    tDelta = (t[-1]-t[0])/(len(t)-1)
+
+    t0Vec = np.linspace(blankDistance*tDelta, t[-1]/K, len(t)*resolution)
+
+    lossInv = np.zeros(len(t0Vec))
+    for i, t0 in enumerate(t0Vec):
+        t0Disc = np.intc(t0/tDelta)
+        idx = np.intc(t0Disc*k)
+        lossInv[i] = np.sum(Rxx[idx])
+
+    t0 = t0Vec[np.argmax(lossInv)]
+    f0=1/t0
+
+    #! Debug code
+    plt.style.use('masterThesis')
+    fig, ax = plt.subplots()
+    #ax.set_xmargin(0.01)
+    ax.plot(t0Vec, lossInv)
+    ax.set_xlabel('$\autoCorr_{\complex{s}}$ Cycle Period [t]')
+    ax.set_ylabel('Correlation')
+    ax.ticklabel_format(useMathText=True, scilimits=(0,3))
+    plt.tight_layout()
+    imagePath = '../figures/cycloDemo/'
+    fileName = 'cycleLossTime'
+    plt.savefig(imagePath + fileName + '.png', bbox_inches='tight')
+    plt.savefig(imagePath + fileName + '.pgf', bbox_inches='tight')
+    #! Debug code
     return f0
 
 def instFreq(sig_t, Fs, method='derivative', *args, **kwargs):

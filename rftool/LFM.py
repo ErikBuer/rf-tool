@@ -61,17 +61,23 @@ class chirp:
         """
         Generate chirps.
         """
-        omega_t = self.getSymbolIF(symbol)  
+        omega_t = self.omega_t
 
         if self.direction=='down':
             omega_t = np.max(omega_t) - (omega_t-np.min(omega_t))
         elif self.direction=='both':
-            # The second half of sympols has invertedd chirp direction
+            # The second half of symbols has invertedd chirp direction
             if np.intc(self.nChirps/2)-1<symbol:
                 omega_t = np.max(omega_t) - (omega_t-np.min(omega_t))
 
         phi_t = util.indefIntegration( omega_t, self.dt )
         sig = np.exp(np.multiply(1j*2*np.pi, phi_t))
+        sig = np.roll( sig, np.intc(self.symbolDelay[symbol]) )
+        #! Debug code
+        """plt.figure()
+        plt.plot(sig)
+        plt.show()"""
+        #! Debug code
         return sig
 
     def getSymbolIF(self, symbol):
@@ -90,17 +96,18 @@ class chirp:
     
     def plotSymbols(self):
         root = np.intc(np.ceil(np.sqrt(self.nChirps)))
-        fig, axs = plt.subplots(root,root)
+        fig, ax = plt.subplots(root,root)
         fig.set_size_inches((7,2.5))
-        for index, axis in enumerate(axs.flat):
+        for index, axis in enumerate(ax.flat):
             if index<self.nChirps:
                 axis.plot(self.t, self.getSymbolIF(index), label=str(index))
                 #axis.legend()
                 axis.set_ylabel('f [Hz]')
                 axis.set_xlabel('t [s]')
+
         plt.tight_layout()
         #fig.suptitle('Chirp Instantaneous Frequency')
-    
+
     def plotAutocorr(self):
         root = np.intc(np.ceil(np.sqrt(self.nChirps)))
         fig, axs = plt.subplots(root,root)
