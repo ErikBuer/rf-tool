@@ -126,18 +126,18 @@ def ACF(x, plot = True, *args, **kwargs):
         
     if plot == True:
         # Plot
-        plt.figure()
-        
+        fig, ax = plt.subplots()      
         for i, column in enumerate(r_xx.T):
             # Normalize
             column = np.absolute(column / abs(column).max())
-            plt.plot(util.mag2db(column), label=plotLabel[i])
+            ax.plot(util.mag2db(column), label=plotLabel[i])
 
-        yMin = np.maximum(-100, np.min(r_xx))
+        ax.ticklabel_format(useMathText=True, scilimits=(0,3))
         plt.legend()
-        plt.ylim([yMin, 0])
+        yMin = np.maximum(-100, np.min(r_xx))
+        ax.set_ylim([yMin, 0])
         plt.title("Autocorrelation Function")
-        plt.ylabel("Normalized Magnitude [dB]")
+        ax.set_ylabel("Normalized Magnitude [dB]")
         plt.tight_layout()
     return r_xx
 

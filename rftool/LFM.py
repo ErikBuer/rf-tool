@@ -18,7 +18,7 @@ import rftool.estimation as estimate
 
 class chirp:
     """
-    Object for generating a set of linear chirps with a 
+    Object for generating a set of linear chirps
     """
     t = None
     T = None
@@ -147,3 +147,21 @@ class chirp:
         plt.pcolormesh(corrmatDb)
         plt.colorbar()
         return corrmatDb
+
+    def modulate( self, symbolStream=np.array([1,0,1,0])):
+        """
+        Modulate bit stream to a chirp. One chirp per symbol.
+        
+        symbolStream is the bitstream to be modulated (numpy array).
+        """
+
+        # Calculate length of signal
+        sigLen = len(symbolStream)*len(self.omega_t)
+        # generate frame
+        packetSig = np.empty([sigLen], dtype=complex)
+        
+
+        # Iterate through symbolStream and add to packetSig
+        for m, symbol in enumerate(symbolStream):
+            packetSig[m*self.points:(m+1)*self.points] = self.getSymbolSig(symbol)
+        return packetSig

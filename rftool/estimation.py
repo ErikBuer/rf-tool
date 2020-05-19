@@ -15,7 +15,7 @@ from pyhht.visualization import plot_imfs   # Hilbert-Huang TF analysis
 from pyhht import EMD                       # Hilbert-Huang TF analysis
 import rftool.utility as util
 
-def pulseCarrierCRLB(p_n, K, l_k, N):
+def pulseCarrierCRLB(p_n, Fs, K, l_k, N):
     """
     Calculates the Cramer-Rao Lower Bound for estimation of carrier frequency of a pulse train of unknown coherent pulses.
     Returns CRLB in angular frequency.
@@ -32,9 +32,9 @@ def pulseCarrierCRLB(p_n, K, l_k, N):
     # Pulse length
     M = len(p_n)
     # Pulse bandwidth
-    B0 = util.energy(np.gradient(p_n)) / E0
+    B0 = util.energy(np.gradient(p_n, 1/Fs)) / E0
     # Time-frequency cross-coupling (skew)
-    C0 = np.imag( np.sum( np.multiply( p_n, np.conj(np.gradient(p_n)) ) ) )
+    C0 = np.imag( np.sum( np.multiply( p_n, np.conj(np.gradient(p_n, 1/Fs)) ) ) )
     R1 = np.mean(l_k[1:])
     R2 = np.mean(np.power(l_k[1:], 2))
     # Variance bound of frequency estimate
@@ -376,7 +376,7 @@ def cyclicEstimator( SCD, f, alpha, bandLimited=True, **kwargs):
     return fCenter, R_symb
 
 
-def f0MLE(psd, f, peaks, blankDistance=2, resolution=4):
+def f0MLE(psd, f, peaks, blankDistance=2, resolution=4): # Blank distance has been 4 for estimation of NLFM symbol rate
     """
     Maximum likelihood estimation of the fundamental frequency of a signal with repeating harmonics in the frequiency domain.
     A frequency domain intrepetation of [1].
@@ -398,17 +398,18 @@ def f0MLE(psd, f, peaks, blankDistance=2, resolution=4):
 
     fDelta = (f[-1]-f[0])/(len(f)-1)
 
-    f0Vec = np.linspace(blankDistance*fDelta, f[-1]/K, np.intc(len(f)*resolution))
-
+    # Rough search
+    f0Vec = np.linspace(blankDistance*fDelta, f[-1]/K, np.intc(len(f)-blankDistance))
     lossInv = np.zeros(len(f0Vec))
     for i, f0 in enumerate(f0Vec):
         f0Disc = f0/fDelta
         idx = np.intc(f0Disc*k)
         lossInv[i] = np.sum(psd[idx])
+
     f0 = f0Vec[np.argmax(lossInv)]
 
     #! Debug code
-    plt.style.use('masterThesis')
+    """plt.style.use('masterThesis')
     fig, ax = plt.subplots()
     #ax.set_xmargin(0.01)
     ax.plot(f0Vec, lossInv)
@@ -419,8 +420,20 @@ def f0MLE(psd, f, peaks, blankDistance=2, resolution=4):
     imagePath = '../figures/cycloDemo/'
     fileName = 'cycleLossFreq'
     plt.savefig(imagePath + fileName + '.png', bbox_inches='tight')
-    plt.savefig(imagePath + fileName + '.pgf', bbox_inches='tight')
+    plt.savefig(imagePath + fileName + '.pgf', bbox_inches='tight')"""
     #! Debug code
+
+    # Fine search
+    f0Vec = np.linspace(f0-fDelta, f0+fDelta, 2*resolution)
+    lossInv = np.zeros(len(f0Vec))
+    for i, f0 in enumerate(f0Vec):
+        f0Disc = f0/fDelta
+        idx = np.intc(f0Disc*k)
+        while len(psd) <= idx[-1]:
+            idx = idx[:-1]
+
+        lossInv[i] = np.sum(psd[idx])
+    f0 = f0Vec[np.argmax(lossInv)]
     return f0
 
 def f0MleTime(Rxx, f, peaks, blankDistance=20, resolution=1):
@@ -460,18 +473,19 @@ def f0MleTime(Rxx, f, peaks, blankDistance=20, resolution=1):
     f0=1/t0
 
     #! Debug code
-    plt.style.use('masterThesis')
+    """plt.style.use('masterThesis')
     fig, ax = plt.subplots()
     #ax.set_xmargin(0.01)
     ax.plot(t0Vec, lossInv)
-    ax.set_xlabel('$\autoCorr_{\complex{s}}$ Cycle Period [t]')
+    ax.set_xlabel('$R_{ss}$ Cycle Period [t]')
     ax.set_ylabel('Correlation')
     ax.ticklabel_format(useMathText=True, scilimits=(0,3))
     plt.tight_layout()
     imagePath = '../figures/cycloDemo/'
     fileName = 'cycleLossTime'
+    plt.show()
     plt.savefig(imagePath + fileName + '.png', bbox_inches='tight')
-    plt.savefig(imagePath + fileName + '.pgf', bbox_inches='tight')
+    plt.savefig(imagePath + fileName + '.pgf', bbox_inches='tight')"""
     #! Debug code
     return f0
 
@@ -729,7 +743,6 @@ def carierFrequencyEstimator( sig_t, Fs, *args, **kwargs ):
         fCenter, fCenterIndex = fftQuadraticInterpolation(np.abs(sig_f), f)
     else:
         fCenter = None
-
     return fCenter
 
 def fftQuadraticInterpolation(X_f, f, **kwargs):
@@ -747,6 +760,10 @@ def fftQuadraticInterpolation(X_f, f, **kwargs):
 
     # Find frequncy bin with highest magnitude
     k = np.argmax(mag)
+    if k == 0:
+        k=1
+    elif k == (len(mag)-1):
+        len(mag)-2
 
     #Quadratic fit around argmax and neighboring bins
     [a0, a1, a2] = np.polynomial.polynomial.polyfit(f[k-1:k+2], mag[k-1:k+2], 2)

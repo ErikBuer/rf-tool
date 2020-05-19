@@ -99,6 +99,7 @@ def periodogram(sig, Fs, nfft = 2048):
     plt.title("Power Spectral Density")
     plt.ylabel("Power density [dBW/Hz]")
     plt.xlabel("Frequency [Hz]")
+    plt.tight_layout()
 
 def welch(x, Fs, nfft = 2048):
     """
@@ -117,6 +118,7 @@ def welch(x, Fs, nfft = 2048):
     plt.title("Welch Power Spectral Density Estimate")
     plt.ylabel("Power density [dBW/Hz]")
     plt.xlabel("Frequency [Hz]")
+    plt.tight_layout()
     return f, Pxx_den
 
 def magnitudeSpectrum(sig, Fs, nfft = 2048, plot = False):
