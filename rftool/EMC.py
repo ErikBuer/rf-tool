@@ -5,6 +5,14 @@ def LisnImpedance():
     Returns the vectors containing the target impedance for MIL-STD-461G.
     The impedance shall be measured into the LISN DUT port with a 50 Ohm load at the instrument port.
     Additional tolerance is +-20%.
+    returns f [Hz], R [Ohm]
+
+
+    f, R = LisnImpedance()
+    import matplotlib.pyplot as plt
+    plt.semilogx(f, R)
+    plt.grid()
+    plt.show()
     """
     target = np.array([[0.15268649405147783, 4.572490706319712],
     [0.18665001853237406, 5.7620817843866305],
@@ -40,8 +48,3 @@ def LisnImpedance():
     f = target[:,0]
     return f, R
 
-f, R = LisnImpedance()
-import matplotlib.pyplot as plt
-plt.semilogx(f, R)
-plt.grid()
-plt.show()
