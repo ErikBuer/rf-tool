@@ -7,7 +7,6 @@ def LisnImpedance():
     Additional tolerance is +-20%.
     returns f [Hz], R [Ohm]
 
-
     f, R = LisnImpedance()
     import matplotlib.pyplot as plt
     plt.semilogx(f, R)
@@ -47,4 +46,3 @@ def LisnImpedance():
     R = target[:,1]
     f = target[:,0]
     return f, R
-

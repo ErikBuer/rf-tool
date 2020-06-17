@@ -104,7 +104,7 @@ def upconvert( sig, f_c, Fs=1 ):
     sig = np.multiply(sig, np.exp(1j*phi_j))
     return sig
 
-def ACF(x, plot = True, *args, **kwargs):
+def ACF(x, Fs, plot = True, *args, **kwargs):
     """
     Normalized autocorrelation Function of input x.
     x is the signal being analyzed. If x is a matrix, the correlation is performed columnwise.
@@ -122,22 +122,25 @@ def ACF(x, plot = True, *args, **kwargs):
     # Iterate through columns
     r_xx = np.empty( shape=[2*np.size(x,0)-1, np.size(x,1)], dtype=complex )
     for n in range(0, np.size(x,1)):
-        r_xx[:,n] = np.correlate(x[:,n], x[:,n], mode='full')
-        
+        #r_xx[:,n] = np.correlate(x[:,n], x[:,n], mode='full')
+        r_xx[:,n] = signal.correlate(x[:,n], x[:,n], method='fft')
+
     if plot == True:
+        tau = np.linspace(-np.floor(len(r_xx)/2)/Fs, np.floor(len(r_xx)/2)/Fs, len(r_xx))
         # Plot
-        fig, ax = plt.subplots()      
+        fig, ax = plt.subplots()
         for i, column in enumerate(r_xx.T):
             # Normalize
             column = np.absolute(column / abs(column).max())
-            ax.plot(util.mag2db(column), label=plotLabel[i])
+            ax.plot(tau, util.mag2db(column), label=plotLabel[i])
 
         ax.ticklabel_format(useMathText=True, scilimits=(0,3))
         plt.legend()
         yMin = np.maximum(-100, np.min(r_xx))
         ax.set_ylim([yMin, 0])
-        plt.title("Autocorrelation Function")
-        ax.set_ylabel("Normalized Magnitude [dB]")
+        #plt.title("Autocorrelation Function")
+        ax.set_ylabel("Normalized Correlation [dB]")
+        ax.set_xlabel("$t$ [s]")
         plt.tight_layout()
     return r_xx
 

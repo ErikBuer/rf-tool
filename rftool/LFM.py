@@ -11,8 +11,8 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 from cycler import cycler
 
-from pyhht.visualization import plot_imfs   # Hilbert-Huang TF analysis
-from pyhht import EMD                       # Hilbert-Huang TF analysis
+"""from pyhht.visualization import plot_imfs   # Hilbert-Huang TF analysis
+from pyhht import EMD                       # Hilbert-Huang TF analysis"""
 import rftool.utility as util
 import rftool.estimation as estimate
 
@@ -102,8 +102,8 @@ class chirp:
             if index<self.nChirps:
                 axis.plot(self.t, self.getSymbolIF(index), label=str(index))
                 #axis.legend()
-                axis.set_ylabel('f [Hz]')
-                axis.set_xlabel('t [s]')
+                axis.set_ylabel('$f$ [Hz]')
+                axis.set_xlabel('$t$ [s]')
 
         plt.tight_layout()
         #fig.suptitle('Chirp Instantaneous Frequency')

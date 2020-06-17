@@ -75,7 +75,7 @@ class HilberHuang:
         frequencyBins is the number of discrete bins from 0 Hz to Fs/2
         includeRes defines whether the residu is included in the spectrum.
 
-        Returns a matrix containing the sum energy in each time-frequnecy bin.
+        Returns a matrix containing the energy sum in each time-frequnecy bin.
 
         - Huang et. al, The empirical mode decomposition and the Hilbert spectrum for nonlinear and non-stationary time series analysis, Proceedings of the Royal Society of London, 1998
         - S.E. Hamdi et al., Hilbert-Huang Transform versus Fourier based analysis for diffused ultrasonic waves structural health monitoring in polymer based composite materials, Proceedings of the Acoustics 2012 Nantes Conference.
@@ -133,12 +133,13 @@ class HilberHuang:
         plt.colorbar(cset, ax=ax)
 
         #ax.set_title("Hilbert Spectrum")
-        ax.set_xlabel('t [s]')
-        ax.set_ylabel('f [Hz]')
+        ax.set_xlabel('$t$ [s]')
+        ax.set_ylabel('$f$ [Hz]')
         ax.set_ylim(0,np.divide(self.Fs,2))
         ax.set_xlim(self.t[1], self.t[-1])
+        ax.ticklabel_format(useMathText=True, scilimits=(0,3))
         plt.tight_layout()
-        return fig
+        return fig, ax
 
     def spectrum( self, *args, **kwargs):
         """
@@ -158,17 +159,18 @@ class HilberHuang:
         fig = plt.figure()
         ax = fig.add_subplot(111)
         cset = None
-        for i in range(np.size(instFreq,0)):
-            cset = ax.scatter(self.t, self.IF[i], c=self.intensity[i], s=5, alpha=0.3, cmap=colorMap)
+        for i in range(np.size(self.IF,0)):
+            cset = ax.scatter(self.t, self.IF[i], c=self.intensity[i], s=5, alpha=0.3)
         plt.colorbar(cset, ax=ax)
 
         ax.set_title("Hilbert Spectrum")
         ax.set_xlabel('t [s]')
         ax.set_ylabel('f [Hz]')
-        ax.set_ylim(0,np.divide(Fs,2))
-        ax.set_xlim(t[1], t[-1])
+        ax.set_ylim(0,np.divide(self.Fs,2))
+        ax.set_xlim(self.t[1], self.t[-1])
+        ax.ticklabel_format(useMathText=True, scilimits=(0,3))
         plt.tight_layout()
-        return fig
+        return fig, ax
 
 
 def FAM(x, *args, **kwargs):
@@ -180,7 +182,7 @@ def FAM(x, *args, **kwargs):
     plot = kwargs.get('plot', False)
     scale = kwargs.get('scale', None) # 'absolute', 'log', 'dB'
     Fs = kwargs.get('Fs', 1)
-    method = kwargs.get('method', 'non-conj') # 'non-conj' or conj
+    method = kwargs.get('method', 'conj') # 'non-conj' or conj
 
     # TODO: Add support for both x(t) and y(t)
     # L << N
@@ -228,9 +230,9 @@ def FAM(x, *args, **kwargs):
     SCD = np.empty_like(xMat, dtype=complex)
 
     for j in range(np.size(SCD, 0)):
-        if method == 'conj':
+        if method == 'non-conj':
             SCD[j,:] = np.multiply(xMat[j,:], np.conjugate(xMat[j,:]))
-        elif method == 'non-conj':
+        elif method == 'conj':
             SCD[j,:] = np.multiply(xMat[j,:], xMat[j,:])
         # P-point FFT
         SCD[j,:] = np.fft.fft(SCD[j,:])
@@ -316,7 +318,8 @@ def cyclicEstimator( SCD, f, alpha, bandLimited=True, **kwargs):
     alphaWindow = np.multiply(np.ones(len(alpha)), triangleAlpha) # Triangular window
     #alphaWindow = np.ones(len(alpha)) Rectangular window
     alphaWindow[alpha0Index-2:alpha0Index+2] = 0
-    alphaWindow = alphaWindow / np.sum(alphaWindow)
+    # alphaWindow = alphaWindow / np.sum(alphaWindow) # Normalize
+    # Allow externally configured window.
     alphaWindow = kwargs.get('alphaWindow', alphaWindow)
 
     #! Debug code
@@ -477,7 +480,7 @@ def f0MleTime(Rxx, f, peaks, blankDistance=20, resolution=1):
     fig, ax = plt.subplots()
     #ax.set_xmargin(0.01)
     ax.plot(t0Vec, lossInv)
-    ax.set_xlabel('$R_{ss}$ Cycle Period [t]')
+    ax.set_xlabel('$R_{ss}$ Cycle Period [s]')
     ax.set_ylabel('Correlation')
     ax.ticklabel_format(useMathText=True, scilimits=(0,3))
     plt.tight_layout()
@@ -696,6 +699,8 @@ def instFreq(sig_t, Fs, method='derivative', *args, **kwargs):
         order = kwargs.get('order', 4)
         windowSize = kwargs.get('windowSize', None)
         f_t = polyMle(sig_t, Fs=Fs, order=order, windowSize=windowSize)
+    else:
+        f_t = np.zeros(len(sig_t))
     return f_t
 
 
