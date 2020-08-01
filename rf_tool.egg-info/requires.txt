@@ -1,0 +1,7 @@
+numpy
+scipy
+mpmath
+pyhht
+tftb
+matplotlib
+cycler
