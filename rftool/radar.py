@@ -15,11 +15,10 @@ import rftool.utility as util
 import rftool.estimation as estimate
 
 def Albersheim( Pfa, Pd, N ):
-    """
-    Calculate required SNR for non-coherent integration over N pulses, by use of Albersheims equation.
+    """Calculate required SNR for non-coherent integration over N pulses, by use of Albersheims equation.
 
-    :param Pd: The probability of detection (linear).
     :param Pfa: The probability of false alarm (linear).
+    :param Pd: The probability of detection (linear).
     :param N: The number of non-coherently integrated pulses.
     :return: Required SNR in dB.
 
@@ -36,14 +35,13 @@ def Albersheim( Pfa, Pd, N ):
     return SNRdB
 
 def Shnidman( Pfa, Pd, N, SW ):
-    """
-    Calculate required SNR for non-coherent integration over N pulses for swerling cases, by use of Shnidman equation.
+    """Calculate required SNR for non-coherent integration over N pulses for swerling cases, by use of Shnidman equation.
 
-    Pd is the probability of detection (linear)
-    Pfa is the probability of false alarm (linear)
-    N is the number of non-coherently integrated pulses
-    SW is the swerling model: 0-4 (zero is non-swerling)
-    Returns SNR in dB
+    :param Pfa: The probability of false alarm (linear).
+    :param Pd: The probability of detection (linear).
+    :param N: The number of non-coherently integrated pulses.
+    :param SW: The Swerling model 0-4 (zero is non-swerling).
+    :return: Required SNR in dB.
 
     Accurate within 1 dB for:
     10^-7   <  Pfa  < 10^-3
@@ -92,10 +90,10 @@ def Shnidman( Pfa, Pd, N, SW ):
     return SNRdB
 
 def upconvert( sig, f_c, Fs=1 ):
-    """
-    Upconvert baseband waveform to IF
-    f_c is the IF center frequency
-    Fs is the sample frequency
+    """Upconvert baseband waveform to IF.
+    :param f_c: The IF center frequency.
+    :param Fs: The sample frequency.
+    :return: The upconverted signal.
     """
     a = np.linspace(0, sig.shape[0]-1, sig.shape[0])
     # Angular increments per sample times sample number
@@ -107,11 +105,10 @@ def upconvert( sig, f_c, Fs=1 ):
 def ACF(x, Fs, plot = True, *args, **kwargs):
     """
     Normalized autocorrelation Function of input x.
-    x is the signal being analyzed. If x is a matrix, the correlation is performed columnwise.
-    plot decides wether to plot the result.
-    label is the plot label for each vector. ['label1', 'label1']
-
-    The output is 2*len(x)-1 long. If the input is a matrix, the output is a matrix.
+    :param x: The signal being analyzed. If x is a matrix, the correlation is performed columnwise.
+    :param plot: Decides wether to plot the result.
+    :param label: The plot label for each vector. ['label1', 'label1'].
+    :return: The output is 2*len(x)-1 long. If the input is a matrix, the output is a matrix.
     """
     plotLabel = kwargs.get('label', None)
 
@@ -147,23 +144,22 @@ def ACF(x, Fs, plot = True, *args, **kwargs):
 
 
 class chirp:
-    """
-    Object for generating linear and non-linear chirp generation.
+    """Object for generating linear and non-linear chirp generation.
     """
     t = None
     T = None
 
     def __init__( self, Fs=1 ):
         """
-        t_i is the chirp duration [s].
-        Fs is the intended sampling frequency [Hz]. Fs must be at last twice the highest frequency in the input PSD. If Fs < 2*max(f), then Fs = 2*max(f)
+        :param t_i: The chirp duration [s].
+        :param Fs: The intended sampling frequency [Hz]. Fs must be at last twice the highest frequency in the input PSD. If Fs < 2*max(f), then Fs = 2*max(f).
         """
         self.Fs = Fs
         self.dt = 1/self.Fs
 
     def checkSampleRate(self):
         """
-        Check that the sample rate is within the nyquist criterion. I.e . that no phase difference between two consecutive samples exceeds pi.
+        Check that the sample rate is within the nyquist criterion. I.e. that no phase difference between two consecutive samples exceeds pi.
         """
         errorVecotr = np.abs(np.gradient(self.targetOmega_t)*2*np.pi)-np.pi
 
@@ -187,9 +183,12 @@ class chirp:
         return sig
 
     def genNumerical( self, direction = None  ):
-        """
-        Generate Non.Linear Frequency Modualted (NLFM) chirps.
-        direction controls the chirp direction. 'inverted' inverts the chirp direction.
+        """Generate Non.Linear Frequency Modualted (NLFM) chirps.
+
+        :param direction: Controls the chirp direction. 'inverted' inverts the chirp direction., defaults to None
+        :type direction: [type], optional
+        :return: Chirp time series.
+        :rtype: [type]
         """
         dt = 1/self.Fs        # seconds
 
@@ -202,7 +201,15 @@ class chirp:
         return sig
 
     def getInstFreq(self, poly=True, plot=True):
-        # Calculate the instantaneous frequency as a function of time
+        """Calculate the instantaneous frequency as a function of time
+
+        :param poly: [description], defaults to True
+        :type poly: bool, optional
+        :param plot: [description], defaults to True
+        :type plot: bool, optional
+        :return: [description]
+        :rtype: [type]
+        """
         if poly == True:
             # Calculate the instantaneous frequency based on polynoimial coefficients.
             polyOmega = np.poly1d(self.c)
@@ -222,7 +229,14 @@ class chirp:
         return omega_t
 
     def getChirpRate(self, poly=True, plot=True):
-        # Calculate the chirp rate as a function of time
+        """Calculate the chirp rate as a function of time.
+
+        :param poly: Decides if the chirprate is calculated based on polynoimial coefficients, defaults to True
+        :type poly: bool, optional
+        :param plot: Decides whether to plot the chirp rate, defaults to True
+        :type plot: bool, optional
+        :return: Chirp rate function.
+        """
         if poly == True:
             # Calculate the chirp rate based on polynoimial coefficients.
             gamma_t = 0
