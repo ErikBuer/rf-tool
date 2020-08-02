@@ -91,8 +91,7 @@ class chirp:
         return sig
 
     def getSymbolIF(self, symbol):
-        """
-        Return the IF of the symbols
+        """Return the IF of the symbols
         """
         omega_t = np.roll( self.omega_t, np.intc(self.symbolDelay[symbol]) )
 
@@ -105,6 +104,8 @@ class chirp:
         return omega_t
     
     def plotSymbols(self):
+        """Plot the various symbols.
+        """
         root = np.intc(np.ceil(np.sqrt(self.nChirps)))
         fig, ax = plt.subplots(root,root)
         fig.set_size_inches((7,2.5))
@@ -119,6 +120,8 @@ class chirp:
         #fig.suptitle('Chirp Instantaneous Frequency')
 
     def plotAutocorr(self):
+        """Plot the autocorrelation of the chirps.
+        """
         root = np.intc(np.ceil(np.sqrt(self.nChirps)))
         fig, axs = plt.subplots(root,root)
         fig.figsize=[7, 4]
@@ -131,6 +134,8 @@ class chirp:
         plt.tight_layout()
 
     def plotXcorr(self):
+        """Plot the cross correlation of the chirps
+        """
         corrmat = np.zeros((self.nChirps,self.nChirps))
         it = np.nditer(corrmat, flags=['multi_index'])
         while not it.finished:
@@ -145,6 +150,11 @@ class chirp:
         
 
     def plotDotProd(self):
+        """Plot the dot-product of the chirps.
+
+        :return: "Correlation" matrix
+        :rtype: ndarray, matrix
+        """
         corrmat = np.zeros((self.nChirps,self.nChirps))
         it = np.nditer(corrmat, flags=['multi_index'])
         while not it.finished:
@@ -159,10 +169,9 @@ class chirp:
         return corrmatDb
 
     def modulate( self, symbolStream=np.array([1,0,1,0])):
-        """
-        Modulate bit stream to a chirp. One chirp per symbol.
+        """Modulate bit stream to a chirp. One chirp per symbol.
         
-        symbolStream is the bitstream to be modulated (numpy array).
+        :param symbolStream: The bitstream to be modulated (numpy array).
         """
 
         # Calculate length of signal

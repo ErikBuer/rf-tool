@@ -3,18 +3,21 @@ import numpy as np
 import scipy.optimize as optimize
 
 def chamberImpedance( x ):
-    """
-    Dimension calculations for an open TEM cell.
+    """Dimension calculations for an open TEM cell.
     S. M. Satav et al., Do-it-Yourself Fabrication of an Open TEM Cell for EMC Pre-compliance, Indian Institute of Technology-Bombay, 2008
     Taking in a parameter vector for the different dimensions.
     
     Chamber below, with ceptum in the center.
-     _______
-    /_______\
-    \_______/
+    .. aafig::
+        :aspect: 60
+        :scale: 150
+        :proportional:
+        :textual:
+         _______
+        /_______\
+        \_______/
     """
 
-    
     d = x[0]    # Height from center conductor to top [m]. Entire chamber is 2d high.
     W = x[1]    # Width of the center conductor (septum) [m].
     L = x[2]    # Length of the test area [m].
@@ -33,8 +36,7 @@ def chamberImpedance( x ):
 
 
 def chamberDimensions( minHeight=10e-2, minWidth=30e-2, minLength=30e-2 ):
-    """
-    Optimization routine for solving the physical dimensions for the chamber which satisifies a 50 ohm impedance.
+    """Optimization routine for solving the physical dimensions for the chamber which satisifies a 50 ohm impedance.
     minHeight is the height of the intended test object.
     minWidth is the x and y dimention of the intended test area.
     """
