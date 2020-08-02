@@ -103,16 +103,20 @@ class HilberHuang:
         return f, self.t, spectrumMat
 
     def discreteSpectrum( self, frequencyBins=256, *args, **kwargs):
-        """
-        Hilbert-Huang transform with Hilbert spectral plot. The result is a matric of discrete time-frequency bins with the cumulated intensity of the IMFs.
+        """Hilbert-Huang transform with Hilbert spectral plot. The result is a matric of discrete time-frequency bins with the cumulated intensity of the IMFs.
         The plot neglects negative frequencies.
 
-        frequencyBins is the number of discrete bins from 0 Hz to Fs/2
-        decimateTime decimates along the time axis to reduce the image size. Input Decimation factor.
-        includeRes defines whether the residu is included in the spectrum.
+        :param frequencyBins: Tthe number of discrete bins from 0 Hz to Fs/2, defaults to 256
+        :type frequencyBins: int, scalar, optional
+        :param \**kwargs:
+            See below
+        :return: a figure with the sum energy in each time-frequnecy bin.
+        :rtype: fig, ax
 
-        Returns a figure with the sum energy in each time-frequnecy bin.
-
+        :Keyword Arguments:
+        * *decimateTime* (``int``) -- Decimates along the time axis to reduce the image size. Input Decimation factor, optional
+        * *includeRes* (``bool``) -- Defines whether the residu is included in the spectrum, defaults to False
+        
         - Huang et. al, The empirical mode decomposition and the Hilbert spectrum for nonlinear and non-stationary time series analysis, Proceedings of the Royal Society of London, 1998
         - S.E. Hamdi et al., Hilbert-Huang Transform versus Fourier based analysis for diffused ultrasonic waves structural health monitoring in polymer based composite materials, Proceedings of the Acoustics 2012 Nantes Conference.
         """
@@ -146,12 +150,14 @@ class HilberHuang:
         return fig, ax
 
     def spectrum( self, *args, **kwargs):
-        """
-        Hilbert-Huang transform with Hilbert spectral plot.
+        """Hilbert-Huang transform with Hilbert spectral plot.
         The plot neglects negative frequencies.
-        
-        sig is a time series
-        Fs is the sample frequency
+
+        :return: [description]
+        :rtype: [type]
+
+        :Keyword Arguments:
+        * *includeRes* (``bool``) -- Defines whether the residu is included in the spectrum, defaults to False
 
         - Huang et. al, The empirical mode decomposition and the Hilbert spectrum for nonlinear and non-stationary time series analysis, Proceedings of the Royal Society of London, 1998
         - S.E. Hamdi et al., Hilbert-Huang Transform versus Fourier based analysis for diffused ultrasonic waves structural health monitoring in polymer based composite materials, Proceedings of the Acoustics 2012 Nantes Conference.
@@ -178,8 +184,21 @@ class HilberHuang:
 
 
 def FAM(x, *args, **kwargs):
-    """
-    Estimate the discrete time Spectral Correlation Density (SCD) using the Time-Smoothing FFT Accumulation Method.
+    """Estimate the discrete time Spectral Correlation Density (SCD) using the Time-Smoothing FFT Accumulation Method.
+
+    :param x: The time series being analyzed
+    :type x: ndarray, time series
+    :param \**kwargs:
+            See below
+    :return: SCD, f_j, alpha_i. A matrix of the specral correlation for frequencies f_j and cyclefrequencies alpha_i
+    :rtype: ndarray
+
+    :Keyword Arguments:
+        * *plot* (``bool``) -- Defines whether to plot the SCD, defaults to False
+        * *scale* (``str``) -- Defines the scaling, 'absolute', 'log', 'dB'
+        * *Fs* (``scalar``) -- Sample frequency [Hz]
+        * *method* (``str``) -- Defines the method, 'conj', 'non-conj'
+
     - Roberts et al., Computationally Efficient Algorithms for Cyclic Spectral Analysis, IEEE SP Magazine, 1991
     - C Spooner, CSP Estimators: The FFT Accumulation Method, https://cyclostationary.blog/2018/06/01/csp-estimators-the-fft-accumulation-method/, 2018
     """
@@ -276,42 +295,29 @@ def FAM(x, *args, **kwargs):
         plt.ylabel("f [Hz]")
         plt.colorbar()
 
-        """# Plot phase
+        # Plot phase
         plt.figure()
         plt.pcolormesh(alpha_i, f_j, angSCD)
         plt.title("Spectral Correlation Density (Phase)")
         plt.xlabel("alpha [Hz]")
         plt.ylabel("f [Hz]")
-        plt.colorbar()"""
-        
-        # Plot Correlation Density as Surf
-        
-        """fig = plt.figure()
-        ax = fig.gca(projection='3d')
-        #ax.set_zlim3d(0, np.max(SCD))
-        Alpha_i, F_j = np.meshgrid(alpha_i, f_j)
-
-        surf = ax.plot_surface(Alpha_i, F_j, SCDplt, linewidth=0, antialiased=False)
-        
-        # Add a color bar which maps values to colors.
-        fig.colorbar(surf) #, shrink=0.5, aspect=5)
-        plt.title("Spectral Correlation Density")
-        plt.xlabel("alpha [Hz]")
-        plt.ylabel("f [Hz]")
-        plt.show"""
+        plt.colorbar()
     return SCD, f_j, alpha_i
 
 def cyclicEstimator( SCD, f, alpha, bandLimited=True, **kwargs):
-    """
-    Estimates center frequency and symbol rate from a Spectral Correlation Density.
-    SCD is an m,n matrix of the Spectral Correlation Density (complex).
-    f is a frequency vector of length m.
-    alpha is a cyclic frequency vector of length n.
-    bandLimited. When set to True, the symbol tate estimator only utilizes the 1 dB bw for estimation. Estimator relies on a >1 dB inband SNR.
+    """Estimates center frequency and symbol rate from a Spectral Correlation Density.
 
-    returns estimated center frequency and symbol rate.
+    :param SCD: An m,n matrix of the Spectral Correlation Density (complex).
+    :type SCD: ndarray, matrix
+    :param f: A frequency vector of length m
+    :type f: ndarray, vector
+    :param alpha: A cyclic frequency vector of length n
+    :type alpha: ndarray, vector
+    :param bandLimited: When set to True, the symbol tate estimator only utilizes the 1 dB bw for estimation. Estimator relies on a >1 dB inband SNR., defaults to True
+    :type bandLimited: bool, optional
+    :return: Estimated center frequency and symbol rate.
+    :rtype: scalar
     """
-
     # Find row for alpha=0
     alpha0Index = np.argmin(np.abs(alpha))
     deltaAlpha = (alpha[-1]-alpha[0])/(len(alpha)-1)
@@ -325,20 +331,6 @@ def cyclicEstimator( SCD, f, alpha, bandLimited=True, **kwargs):
     # alphaWindow = alphaWindow / np.sum(alphaWindow) # Normalize
     # Allow externally configured window.
     alphaWindow = kwargs.get('alphaWindow', alphaWindow)
-
-    #! Debug code
-    """fig, ax = plt.subplots()
-    ax.plot(alpha, window)
-    ax.set_xlabel('alpha [Hz]')
-    ax.set_ylabel('Weighting')
-    ax.ticklabel_format(useMathText=True, scilimits=(0,3))
-    plt.tight_layout()
-    imagePath = '../figures/cycloDemo/'
-    fileName = 'alphaWindow' # str(m_analysis.iterations)
-    plt.savefig(imagePath + fileName + '.png', bbox_inches='tight')
-    plt.savefig(imagePath + fileName + '.pgf', bbox_inches='tight')
-    plt.show()"""
-    #! Debug code
     
     freqEstVetctor = np.dot(alphaWindow, np.abs(SCD.T)) # Utilize the cyclic dimension for frequency estimation.
     fWindow = kwargs.get('fWindow', np.array([1]))
@@ -384,18 +376,24 @@ def cyclicEstimator( SCD, f, alpha, bandLimited=True, **kwargs):
 
 
 def f0MLE(psd, f, peaks, blankDistance=2, resolution=4): # Blank distance has been 4 for estimation of NLFM symbol rate
-    """
-    Maximum likelihood estimation of the fundamental frequency of a signal with repeating harmonics in the frequiency domain.
+    """Maximum likelihood estimation of the fundamental frequency of a signal with repeating harmonics in the frequiency domain.
     A frequency domain intrepetation of [1].
 
-    PSD is the two-sided frequency domain representation of the signal under observation.
-    f is the frequency vector of PSD
-    peaks, is the number of harmonic peaks to include in the estimation.
-    resolution is the fractional resolution of the estimate. When resolution=1, then the PSD resolution is the bound.
-
+    :param psd: the two-sided frequency domain representation of the signal under observation
+    :type psd: ndarray, vector
+    :param f: The frequency vector of PSD
+    :type f: ndarray, vector
+    :param peaks: The number of harmonic peaks to include in the estimation
+    :type peaks: integer, scalar
+    :param blankDistance: The distance which the estimats are neglected, defaults to 2
+    :type blankDistance: int, optional
+    :param resolution: The fractional resolution of the estimate. When resolution=1, then the PSD resolution is the bound., defaults to 4
+    :type resolution: int, optional
+    :return: Estimated funcamental frequency
+    :rtype: scalar
+    
     [1] Wise et. al, Maximum likelihood pitch estimation, IEEE Transactions on Acoustics, Speech, and Signal Processing, 1976
     """
-
     # Convert psd to singlesided
     psd = np.add( psd[np.intc(len(psd)/2):np.intc(len(psd)-1)], np.flip(psd[0:np.intc((len(psd)/2)-1)]) )
     f = f[np.intc(len(f)/2):len(f)-1]
@@ -415,21 +413,6 @@ def f0MLE(psd, f, peaks, blankDistance=2, resolution=4): # Blank distance has be
 
     f0 = f0Vec[np.argmax(lossInv)]
 
-    #! Debug code
-    """plt.style.use('masterThesis')
-    fig, ax = plt.subplots()
-    #ax.set_xmargin(0.01)
-    ax.plot(f0Vec, lossInv)
-    ax.set_xlabel('Harmonic Cycle Frequency [Hz]')
-    ax.set_ylabel('Correlation')
-    ax.ticklabel_format(useMathText=True, scilimits=(0,3))
-    plt.tight_layout()
-    imagePath = '../figures/cycloDemo/'
-    fileName = 'cycleLossFreq'
-    plt.savefig(imagePath + fileName + '.png', bbox_inches='tight')
-    plt.savefig(imagePath + fileName + '.pgf', bbox_inches='tight')"""
-    #! Debug code
-
     # Fine search
     f0Vec = np.linspace(f0-fDelta, f0+fDelta, 2*resolution)
     lossInv = np.zeros(len(f0Vec))
@@ -444,19 +427,23 @@ def f0MLE(psd, f, peaks, blankDistance=2, resolution=4): # Blank distance has be
     return f0
 
 def f0MleTime(Rxx, f, peaks, blankDistance=20, resolution=1):
-    """
-    Maximum likelihood estimation of the fundamental frequency of a signal with repeating autocorrelation peaks.
+    """Maximum likelihood estimation of the fundamental frequency of a signal with repeating autocorrelation peaks.
 
-    If mode is 'autocorr':
-    sig (Rxx) is the two-sided ('full') autocorrelation.
-    f is sampling frequency
-    peaks, is the number of harmonic peaks to include in the estimation.
-    Returns the fundamental/cyclic frequency f0
-    blankDistance is the distance from full overlap wchich is to be ignored in the estimation
+    :param Rxx: The two-sided ('full') autocorrelation
+    :type Rxx: ndarray, vector
+    :param f: The sampling frequency [Hz]
+    :type f: scalar
+    :param peaks: The number of harmonic peaks to include in the estimation
+    :type peaks: int, scalar
+    :param blankDistance: The distance from full overlap wchich is to be ignored in the estimation, defaults to 20
+    :type blankDistance: int, optional
+    :param resolution: [description], defaults to 1
+    :type resolution: int, optional
+    :return: The fundamental/cyclic frequency f0
+    :rtype: scalar
 
     [1] Wise et. al, Maximum likelihood pitch estimation, IEEE Transactions on Acoustics, Speech, and Signal Processing, 1976
     """
-
     Fs = f
     dt = (1/Fs)
     # Singlesided RXX as per the definision in [1]
@@ -478,43 +465,31 @@ def f0MleTime(Rxx, f, peaks, blankDistance=20, resolution=1):
 
     t0 = t0Vec[np.argmax(lossInv)]
     f0=1/t0
-
-    #! Debug code
-    """plt.style.use('masterThesis')
-    fig, ax = plt.subplots()
-    #ax.set_xmargin(0.01)
-    ax.plot(t0Vec, lossInv)
-    ax.set_xlabel('$R_{ss}$ Cycle Period [s]')
-    ax.set_ylabel('Correlation')
-    ax.ticklabel_format(useMathText=True, scilimits=(0,3))
-    plt.tight_layout()
-    imagePath = '../figures/cycloDemo/'
-    fileName = 'cycleLossTime'
-    plt.show()
-    plt.savefig(imagePath + fileName + '.png', bbox_inches='tight')
-    plt.savefig(imagePath + fileName + '.pgf', bbox_inches='tight')"""
-    #! Debug code
     return f0
 
 def instFreq(sig_t, Fs, method='derivative', *args, **kwargs):
-    """
-    Estimate the instantaneous frequency of a time series.
+    """Estimate the instantaneous frequency of a time series.
 
-    sig_t is the signal time series.
-    Fs is the sample frequency.
-    method decides the estimation method:
-        'derivative' is a numerical approximation of the following $f(t) = \frac{1}{2\pi}\od{\Phi(t)}{t}$
-        'BarnesTwo' is Barnes "two-point filter approximation".
-        'BarnesThree' is the Barnes "three-point filter approximation".
-        'Claerbouts' is the Claerbouts approximation.
-        'maxDHHT' is a numerical maximum likelihood method on the Discretized Hilbert spectrum.
-        'polyLeastSquares' uses a method of phase polynomial with a least squares coefficient estimation. 
-        'polyMle' uses a method of phase polynomial with a maxumum likelihood coefficient estimation.
-
-    Returns the instantaneous frequency over time.
+    :param sig_t: Time series being analyzed
+    :type sig_t: [type]
+    :param Fs: The sample frequency [Hz]
+    :type Fs: [type]
+    :param method: Parameter deciding the estimator, defaults to 'derivative'
+        - 'derivative' is a numerical approximation of the following $f(t) = \frac{1}{2\pi}\od{\Phi(t)}{t}$
+        - 'BarnesTwo' is Barnes "two-point filter approximation".
+        - 'BarnesThree' is the Barnes "three-point filter approximation".
+        - 'Claerbouts' is the Claerbouts approximation.
+        - 'maxDHHT' is a numerical maximum likelihood method on the Discretized Hilbert spectrum.
+        - 'polyLeastSquares' uses a method of phase polynomial with a least squares coefficient estimation. 
+        - 'polyMle' uses a method of phase polynomial with a maxumum likelihood coefficient estimation.
+    :type method: str, optional
+    :return: The instantaneous frequency as a function of time
+    :rtype: ndarray, time series
+    
     - A. E. Barnes, The calculation of instantaneous frequency and instantaneous bandwidth, GEOPHYSICS, VOL. 57, NO. 11, 1992
     - Boashash et. al, Algorithms for instantaneous frequency estimation: a comparative study, Proceedings of SPIE, 1990
     """
+
     if np.isrealobj(sig_t):
         sig_t = signal.hilbert(sig_t)
 
