@@ -68,14 +68,18 @@ class HilberHuang:
         self.intensity = np.absolute(analyticalIMF)
 
     def discreteMatrix( self, frequencyBins=256, *args, **kwargs):
-        """
-        Hilbert-Huang transform with Hilbert spectral plot. The result is a matric of discrete time-frequency bins with the cumulated intensity of the IMFs.
+        """Hilbert-Huang transform with Hilbert spectral plot. The result is a matric of discrete time-frequency bins with the cumulated intensity of the IMFs.
         The plot neglects negative frequencies.
 
-        frequencyBins is the number of discrete bins from 0 Hz to Fs/2
-        includeRes defines whether the residu is included in the spectrum.
+        :param frequencyBins: The number of discrete bins from 0 Hz to Fs/2, defaults to 256
+        :type frequencyBins: int, optional
+        :param \**kwargs:
+            See below
+        :return: A matrix containing the energy sum in each time-frequnecy bin
+        :rtype: ndarray, matrix
 
-        Returns a matrix containing the energy sum in each time-frequnecy bin.
+        :Keyword Arguments:
+        * *includeRes* (``bool``) -- Defines whether the residual is included in the spectrum, defaults to False
 
         - Huang et. al, The empirical mode decomposition and the Hilbert spectrum for nonlinear and non-stationary time series analysis, Proceedings of the Royal Society of London, 1998
         - S.E. Hamdi et al., Hilbert-Huang Transform versus Fourier based analysis for diffused ultrasonic waves structural health monitoring in polymer based composite materials, Proceedings of the Acoustics 2012 Nantes Conference.

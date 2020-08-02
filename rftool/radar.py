@@ -30,6 +30,7 @@ def Albersheim( Pfa, Pd, N ):
     10^-7   <  Pfa  < 10^-3
     0.1     <  Pd   < 0.9
     1       <= N    < 8096
+
     - M. A. Richards and J. A. Scheer and W. A. Holm, Principles of Modern Radar, SciTech Publishing, 2010 
     """
 
@@ -56,6 +57,7 @@ def Shnidman( Pfa, Pd, N, SW ):
     10^-7   <  Pfa  < 10^-3
     0.1     <= Pd   =< 0.99*10^-9
     1       <= N    < 100
+    
     - M. A. Richards and J. A. Scheer and W. A. Holm, Principles of Modern Radar, SciTech Publishing, 2010 
     """
     C = 0

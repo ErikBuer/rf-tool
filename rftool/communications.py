@@ -11,8 +11,9 @@ def Q( x ):
 def errorProbabilityBpsk( EbN0 ):
     """Probability of error in AWGN as a function of Eb/N0 for Binary Phase Shift Keying (BPSK).
 
-    :param EbN0: The intended ratio (scalar or vector).
-    :return: Error probability.
+    :param EbN0: The intended ratio
+    :type EbN0: ndarray, scalar or vector
+    :return: Error probability
 
     - T. S. Rappaport, Wireless Communications Principles and Practice, 2nd ed, Prentice Hall, 1995 
     """
@@ -21,7 +22,8 @@ def errorProbabilityBpsk( EbN0 ):
 def errorProbabilityQpsk( EbN0 ):
     """Probability of error in AWGN as a function of Eb/N0 for Quadrature Phase Shift Keying (QPSK).
 
-    :param EbN0: The intended ratio (scalar or vector).
+    :param EbN0: The intended ratio
+    :type EbN0: ndarray, scalar or vector
     :return: Error probability.
 
     - T. S. Rappaport, Wireless Communications Principles and Practice, 2nd ed, Prentice Hall, 1995
@@ -31,7 +33,8 @@ def errorProbabilityQpsk( EbN0 ):
 def errorProbabilityMPsk( EbN0, M ):
     """Probability of error in AWGN as a function of Eb/N0 for M-Ary Phase Shift Keying (M-PSK).
 
-    :param EbN0: The intended ratio (scalar or vector).
+    :param EbN0: The intended ratio
+    :type EbN0: ndarray, scalar or vector
     :return: Error probability.
 
     - T. S. Rappaport, Wireless Communications Principles and Practice, 2nd ed, Prentice Hall, 1995
@@ -41,7 +44,8 @@ def errorProbabilityMPsk( EbN0, M ):
 def errorProbabilityFsk( EbN0 ):
     """Probability of error in AWGN as a function of Eb/N0 for non-coherent Frequency Shift Keying (FSK).
 
-    :param EbN0: The intended ratio (scalar or vector).
+    :param EbN0: The intended ratio
+    :type EbN0: ndarray, scalar or vector
     :return: Error probability.
 
     - T. S. Rappaport, Wireless Communications Principles and Practice, 2nd ed, Prentice Hall, 1995
@@ -51,7 +55,8 @@ def errorProbabilityFsk( EbN0 ):
 def errorProbabilityCoherentFsk( EbN0 ):
     """Probability of error in AWGN as a function of Eb/N0 for coherent Frequency Shift Keying (FSK).
 
-    :param EbN0: The intended ratio (scalar or vector).
+    :param EbN0: The intended ratio
+    :type EbN0: ndarray, scalar or vector
     :return: Error probability.
 
     - T. S. Rappaport, Wireless Communications Principles and Practice, 2nd ed, Prentice Hall, 1995
@@ -61,8 +66,10 @@ def errorProbabilityCoherentFsk( EbN0 ):
 def errorProbabilityCoherentMFsk( EbN0, M ):
     """Probability of error in AWGN as a function of Eb/N0 for coherent M-ary Frequency Shift Keying (M-FSK).
 
-    :param EbN0: The intended ratio (scalar or vector).
-    :param M: The order of the modultion.
+    :param EbN0: The intended ratio
+    :type EbN0: ndarray, scalar or vector
+    :param M: The order of the modultion
+    :type M: int, scalar
     :return: Error probability.
 
     - T. S. Rappaport, Wireless Communications Principles and Practice, 2nd ed, Prentice Hall, 1995
@@ -72,7 +79,8 @@ def errorProbabilityCoherentMFsk( EbN0, M ):
 def errorProbabilityGMSK( EbN0 ):
     """Probability of error in AWGN as a function of Eb/N0 and the 3-dB bandwidth bit-dutation product, BT = 0.25 for Gaussian Minimum Shift Keying (GMSK).
 
-    :param EbN0: The intended ratio (scalar or vector).
+    :param EbN0: The intended ratio
+    :type EbN0: ndarray, scalar or vector
     :return: Error probability.
 
     - T. S. Rappaport, Wireless Communications Principles and Practice, 2nd ed, Prentice Hall, 1995
@@ -83,8 +91,10 @@ def errorProbabilityGMSK( EbN0 ):
 def errorProbabilityQam( EbN0 , M ):
     """Probability of error in AWGN as a function of Eb/N0 with the minimum Eb and order M for Quadrature Amplitude Modulaion (QAM).
 
-    :param EbN0: The intended ratio (scalar or vector).
-    :param M: The order of the modultion.
+    :param EbN0: The intended ratio
+    :type EbN0: ndarray, scalar or vector
+    :param M: The order of the modultion
+    :type M: int, scalar
     :return: Error probability.
 
     - T. S. Rappaport, Wireless Communications Principles and Practice, 2nd ed, Prentice Hall, 1995
@@ -94,8 +104,10 @@ def errorProbabilityQam( EbN0 , M ):
 def EbN0toSNRdB(EbN0, M, Fs, Fsymb):
     """Calculte the necessary SNR in order to obtain a target Eb/N0.
 
-    :param EbN0: The intended ratio (scalar or vector).
-    :param M: The order of the modultion.
+    :param EbN0: The intended ratio
+    :type EbN0: ndarray, scalar or vector
+    :param M: The order of the modultion
+    :type M: int, scalar 
     :param Fs: The sample rate of the signal.
     :param Fsymb: The symbol rate of the signal (pulse rate).
     :return: Necessary SNR for obtaining a Eb/N0 in Deci-Bell form.
