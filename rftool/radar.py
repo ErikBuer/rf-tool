@@ -17,10 +17,14 @@ import rftool.estimation as estimate
 def Albersheim( Pfa, Pd, N ):
     """Calculate required SNR for non-coherent integration over N pulses, by use of Albersheims equation.
 
-    :param Pfa: The probability of false alarm (linear).
-    :param Pd: The probability of detection (linear).
-    :param N: The number of non-coherently integrated pulses.
-    :return: Required SNR in dB.
+    :param Pfa: The probability of false alarm (linear)
+    :type Pfa: scalar
+    :param Pd: The probability of detection (linear)
+    :type Pd: scalar
+    :param N: The number of non-coherently integrated pulses
+    :type N: Integer
+    :return: Required SNR in dB
+    :rtype: scalar
 
     Accurate within 0.2 dB for:
     10^-7   <  Pfa  < 10^-3
@@ -37,11 +41,16 @@ def Albersheim( Pfa, Pd, N ):
 def Shnidman( Pfa, Pd, N, SW ):
     """Calculate required SNR for non-coherent integration over N pulses for swerling cases, by use of Shnidman equation.
 
-    :param Pfa: The probability of false alarm (linear).
-    :param Pd: The probability of detection (linear).
-    :param N: The number of non-coherently integrated pulses.
-    :param SW: The Swerling model 0-4 (zero is non-swerling).
+    :param Pfa: The probability of false alarm (linear)
+    :type Pfa: scalar
+    :param Pd: The probability of detection (linear)
+    :type Pd: scalar
+    :param N: The number of non-coherently integrated pulses
+    :type N: Integer
+    :param SW: The Swerling model 0-4 (zero is non-swerling)
+    :type SW: Integer
     :return: Required SNR in dB.
+    :rtype: scalar
 
     Accurate within 1 dB for:
     10^-7   <  Pfa  < 10^-3
@@ -92,8 +101,11 @@ def Shnidman( Pfa, Pd, N, SW ):
 def upconvert( sig, f_c, Fs=1 ):
     """Upconvert baseband waveform to IF.
     :param f_c: The IF center frequency.
+    :type f_c: scalar
     :param Fs: The sample frequency.
+    :type Fs: integer, scalar
     :return: The upconverted signal.
+    :rtype: ndarray
     """
     a = np.linspace(0, sig.shape[0]-1, sig.shape[0])
     # Angular increments per sample times sample number
@@ -102,13 +114,24 @@ def upconvert( sig, f_c, Fs=1 ):
     sig = np.multiply(sig, np.exp(1j*phi_j))
     return sig
 
-def ACF(x, Fs, plot = True, *args, **kwargs):
-    """
-    Normalized autocorrelation Function of input x.
-    :param x: The signal being analyzed. If x is a matrix, the correlation is performed columnwise.
-    :param plot: Decides wether to plot the result.
-    :param label: The plot label for each vector. ['label1', 'label1'].
-    :return: The output is 2*len(x)-1 long. If the input is a matrix, the output is a matrix.
+def ACF(x, Fs, plot = True, **kwargs):
+    """Normalized autocorrelation Function of input x.
+
+    :param x: The signal being analyzed. If x is a matrix, the correlation is performed columnwise
+    :type x: Vector or matrix, ndarray
+    :param Fs: The sample frequency.
+    :type Fs: integer, scalar
+    :param plot: Decides whether to plot the result, defaults to True
+    :type plot: bool, optional
+    :param \**kwargs:
+        See below
+    :return: The output is 2*len(x)-1 long.
+    :rtype: Vector or matrix. If the input is a matrix, the output is a matrix (ndarray)
+
+
+    :Keyword Arguments:
+        * *label* (``list``) --
+          The plot label for each vector as such: ['label0', 'label1']
     """
     plotLabel = kwargs.get('label', None)
 
@@ -152,7 +175,9 @@ class chirp:
     def __init__( self, Fs=1 ):
         """
         :param t_i: The chirp duration [s].
+        :type t_i: scalar
         :param Fs: The intended sampling frequency [Hz]. Fs must be at last twice the highest frequency in the input PSD. If Fs < 2*max(f), then Fs = 2*max(f).
+        :type Fs: scalar
         """
         self.Fs = Fs
         self.dt = 1/self.Fs
@@ -169,7 +194,10 @@ class chirp:
     def genFromPoly( self, direction = None ):
         """
         Generate Non-Linear Frequency Modualted (NLFM) chirps based on a polynomial of arbitrary order.
-        direction controls the chirp direction. 'inverted' inverts the chirp direction.
+        :param direction: Controls the chirp direction. ``'inverted'`` inverts the chirp direction, defaults to None
+        :type direction: str
+        :return: Chirp
+        :rtype: ndarray, time series
         """
         dt = 1/self.Fs        # seconds
         polyOmega = np.poly1d(self.c)
@@ -185,10 +213,10 @@ class chirp:
     def genNumerical( self, direction = None  ):
         """Generate Non.Linear Frequency Modualted (NLFM) chirps.
 
-        :param direction: Controls the chirp direction. 'inverted' inverts the chirp direction., defaults to None
-        :type direction: [type], optional
-        :return: Chirp time series.
-        :rtype: [type]
+        :param direction: Controls the chirp direction. ``'inverted'`` inverts the chirp direction, defaults to None
+        :type direction: str
+        :return: Chirp
+        :rtype: ndarray, time series
         """
         dt = 1/self.Fs        # seconds
 
@@ -203,12 +231,12 @@ class chirp:
     def getInstFreq(self, poly=True, plot=True):
         """Calculate the instantaneous frequency as a function of time
 
-        :param poly: [description], defaults to True
+        :param poly: Decides whther to use polynomial coefficients, defaults to True
         :type poly: bool, optional
-        :param plot: [description], defaults to True
+        :param plot: Decides whether to plot the IF, defaults to True
         :type plot: bool, optional
-        :return: [description]
-        :rtype: [type]
+        :return: Instantaneous frequency
+        :rtype: ndarray, time series
         """
         if poly == True:
             # Calculate the instantaneous frequency based on polynoimial coefficients.
@@ -235,7 +263,8 @@ class chirp:
         :type poly: bool, optional
         :param plot: Decides whether to plot the chirp rate, defaults to True
         :type plot: bool, optional
-        :return: Chirp rate function.
+        :return: Chirp rate function
+        :rtype: ndarray, time series
         """
         if poly == True:
             # Calculate the chirp rate based on polynoimial coefficients.
@@ -258,8 +287,14 @@ class chirp:
         return gamma_t
 
     def PSD( self, sig_t, plot=False ):
-        """
-        Calculates Power Spectral Density in dBW/Hz.
+        """Calculates Power Spectral Density in dBW/Hz.
+
+        :param sig_t: Signal time series.
+        :type sig_t: ndarray
+        :param plot: Decides whether to plot the PSD, defaults to False
+        :type plot: bool, optional
+        :return: PSD as a vector (dBW/Hz)
+        :rtype: ndarray, vector
         """
         f, psd = signal.welch(sig_t, fs=self.Fs, nfft=self.fftLen, nperseg=self.fftLen, window = signal.blackmanharris(self.fftLen),
         noverlap = self.fftLen/4, return_onesided=False)
@@ -277,8 +312,12 @@ class chirp:
         return psd
 
     def W( self, omega ):
-        """
-        Lookup table for the W function. Takes instantaneous frequency as input.
+        """Lookup table for the W function. Takes instantaneous frequency as input.
+
+        :param omega: Insatnaneous frequency vector/time series
+        :type omega: ndarray
+        :return: Chirp bandwidth
+        :rtype: scalar
         """
         delta_omega_W = self.omega_W[1]-self.omega_W[0]
 
@@ -294,9 +333,11 @@ class chirp:
         return W_omega
 
     def gamma_t_objective( self, scale ):
-        """
-        Objective function for finding gamma_t that meets the constraints.
+        """Objective function for finding gamma_t that meets the constraints.
         scale scales the gamma function.
+
+        :return: Cost
+        :rtype: scalar
         """
         self.iterationCount = self.iterationCount +1
         if self.iterationCount % 10 == 0:
@@ -323,18 +364,22 @@ class chirp:
         return cost
 
     def getCoefficients( self, window, T=1e-3, targetBw=10e3, centerFreq=20e3, order=48):
-        """
-        Calculate the necessary coefficients in order to generate a NLFM chirp with a specific magnitude envelope (in frequency domain). Chirp generated using rftool.radar.generate().
+        """Calculate the necessary coefficients in order to generate a NLFM chirp with a specific magnitude envelope (in frequency domain). Chirp generated using rftool.radar.generate().
         Coefficients are found through non-linear optimization.
 
-        Window_ is the window function for the target PSD. It is used as a LUT based function from -Omega/2 to Omega/2, where Omega=targetBw.
-        T is the pulse duration [s].
-        targetBw is the taget bandwidth of the chirp [Hz].
-        centerFreq is the center frequency of the chirp [Hz].
-        order is the oder of the phase polynomial used to generate the chirp frequency characteristics [integer].
-        pints is the number of points used t evaluate the chirp function. Not to be confused with the number of samples in the genrerated IF chirp.
+        :param window: The window function for the target PSD. It is used as a LUT based function from -Omega/2 to Omega/2, where Omega=targetBw.
+        :type window: ndarray
+        :param T: The pulse duration [s]., defaults to 1e-3
+        :type T: scalar, optional
+        :param targetBw: The taget bandwidth of the chirp [Hz], defaults to 10e3
+        :type targetBw: scalar, optional
+        :param centerFreq: The center frequency of the chirp [Hz], defaults to 20e3
+        :type centerFreq: scalar, optional
+        :param order: he order of the phase polynomial used to generate the chirp frequency characteristics [integer], defaults to 48
+        :type order: int, scalar, optional
+        :return: Polynomial coefficients
+        :rtype: ndarray, vector
         """
-
         self.Omega = targetBw
         self.window = np.maximum(window, 1e-8)
         
@@ -374,11 +419,15 @@ class chirp:
 
 
     def modulate( self, bitstream=np.array([1,0,1,0])):
-        """
-        Modulate bit stream to a chirp. One chirp per bit. A 1 is represented as a forward time chirp.
+        """Modulate bit stream to a chirp. One chirp per bit. A 1 is represented as a forward time chirp.
         A zero is represented as a time-reversed chirp.
         
         bitStream is the bitstream to be modulated (numpy array).
+
+        :param bitstream: [description], defaults to np.array([1,0,1,0])
+        :type bitstream: vector, optional
+        :return: Modulated waveform
+        :rtype: ndarray, time series
         """
 
         # Generate t and T if it doesn't exist
