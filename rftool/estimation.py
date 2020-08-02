@@ -471,11 +471,12 @@ def instFreq(sig_t, Fs, method='derivative', *args, **kwargs):
     """Estimate the instantaneous frequency of a time series.
 
     :param sig_t: Time series being analyzed
-    :type sig_t: [type]
+    :type sig_t: ndarray, time series
     :param Fs: The sample frequency [Hz]
-    :type Fs: [type]
+    :type Fs: scalar
     :param method: Parameter deciding the estimator, defaults to 'derivative'
-        - 'derivative' is a numerical approximation of the following $f(t) = \frac{1}{2\pi}\od{\Phi(t)}{t}$
+
+        - 'derivative' is a numerical approximation of the direct derivative approach
         - 'BarnesTwo' is Barnes "two-point filter approximation".
         - 'BarnesThree' is the Barnes "three-point filter approximation".
         - 'Claerbouts' is the Claerbouts approximation.
@@ -570,12 +571,16 @@ def instFreq(sig_t, Fs, method='derivative', *args, **kwargs):
         return f_t
 
     def polyMle(sig_t, Fs, order, *args, **kwargs):
-        """
-        Estimate the instantaneous frequency through the use of a polynimial phase function and MLE coefficient estimation.
+        """Estimate the instantaneous frequency through the use of a polynimial phase function and MLE coefficient estimation.
 
-        sig_t is the time series to estimate.
-        Fs is the sample frequency.
-        order is the polynomial order.
+        :param sig_t: The time series to estimate.
+        :type sig_t: ndarray, time series
+        :param Fs: The sample frequency.
+        :type Fs: scalar
+        :param order: The polynomial order
+        :type order: int, scalar
+        :return: Instantaneous frequency
+        :rtype: ndarray, time series
 
         - Boashash et. al, Algorithms for instantaneous frequency estimation: a comparative study, Proceedings of SPIE, 1990
         """
@@ -684,22 +689,31 @@ def instFreq(sig_t, Fs, method='derivative', *args, **kwargs):
 
 
 def carierFrequencyEstimator( sig_t, Fs, *args, **kwargs ):
-    """
-    Estimate the carrier frequency of a signal using an autocorrelation method, or a frequency domain maximum likelihood method.
+    """Estimate the carrier frequency of a signal using an autocorrelation method, or a frequency domain maximum likelihood method.
     Autocorrelation method is applicable for sigle carrier signals as ASK, PSK, QAM.
     MLE method is applicable for the signal above in addition to continious carrier signals such as chirp.
-        The MLE method utilizes either periodogram or Welch's method of spectral estimation.
+    The MLE method utilizes either periodogram or Welch's method of spectral estimation.
 
-    sig_t is the signal being analyzed.
-    Fs is the sampling frequency.
-    method decides which method is used, 'xcor' for autocorrelation method (default), 'mle' for maximum likelihood method.
-    nfft configures the length of the FFT used in the MLE method.
+    :param sig_t: The signal being analyzed.
+    :type sig_t: ndarray, time series
+    :param Fs: Sample frequency
+    :type Fs: scalar
+    :param \**kwargs:
+            See below
+    :return: Estimated center frequency
+    :rtype: scalar
+
+    :Keyword Arguments:
+        * *method* (str) -- Decides which method is used, 'xcor' for autocorrelation method (default), 'mle' for maximum likelihood method.
+        * *nfft* (int, scalar) -- Configures the length of the FFT used in the MLE method.
 
     Correlation method:
+
     - Z. Yu et al., A blind carrier frequency estimation algorithm for digitally modulated signals, IEEE 2004
     - Wang et al., Improved Carrier Frequency Estimation Based on Autocorrelation, Advances in Computer, Communication, Control and Automation, Springer 2011
 
     Maximum likelihood method:
+
     - Stotica et al., Maximum Likelihood Estimation of the Parameters of Multiple Sinusoids from Noisy Measurements, IEEE 1989
     """
     method = kwargs.get('method', None)
@@ -730,14 +744,15 @@ def carierFrequencyEstimator( sig_t, Fs, *args, **kwargs ):
     return fCenter
 
 def fftQuadraticInterpolation(X_f, f, **kwargs):
-    """
-    Estimate the carrier frequency of a signal using quadratic interpolation.
+    """Estimate the carrier frequency of a signal using quadratic interpolation.
     This function is called from carierFrequencyEstimator.
 
-    X_f is the complex frequency domain vector of the signal.
-    f is the corresponding frequency vector.
-
-    Returns the center frequency and its index
+    :param X_f: The complex frequency domain vector of the signal.
+    :type X_f: ndarray, vector
+    :param f: The corresponding frequency vector.
+    :type f: ndarray, vector
+    :return: The center frequency and its index
+    :rtype: scalar
     """
     # Magnitude vector
     mag = np.abs(X_f)
@@ -750,28 +765,7 @@ def fftQuadraticInterpolation(X_f, f, **kwargs):
         len(mag)-2
 
     #Quadratic fit around argmax and neighboring bins
-    [a0, a1, a2] = np.polynomial.polynomial.polyfit(f[k-1:k+2], mag[k-1:k+2], 2)
-
-    
-    """#! Debug code
-    fig, ax = plt.subplots()
-    ax.stem(f[k-1:k+2], mag[k-1:k+2], label='$|Z(f)|$')
-    polyFreq = np.linspace(f[k-1], f[k+1], 30)
-    polyCurve = np.polynomial.polynomial.polyval(polyFreq, [a0, a1, a2])
-    ax.plot( polyFreq, polyCurve, color='#81a4fa', label='Polynomial fit')
-    ax.set_ylim(np.min(polyCurve)-((np.max(polyCurve)-np.min(polyCurve))/5), np.max(polyCurve)+((np.max(polyCurve)-np.min(polyCurve))/5))
-    ax.set_xlim(polyFreq[0]-np.abs((polyFreq[-1]-polyFreq[0])/10), polyFreq[-1]+np.abs((polyFreq[-1]-polyFreq[0])/10))
-    ax.set_xlabel('f [Hz]')
-    ax.set_ylabel('Magnitude')
-    plt.legend()
-    plt.tight_layout()
-    imagePath = '../figures/'
-    fileName = 'polyMleIllustration' # str(m_analysis.iterations)
-    plt.savefig(imagePath + fileName + '.png', bbox_inches='tight')
-    plt.savefig(imagePath + fileName + '.pgf', bbox_inches='tight')
-    plt.show()
-    #! End debug code"""
-    
+    [a0, a1, a2] = np.polynomial.polynomial.polyfit(f[k-1:k+2], mag[k-1:k+2], 2)   
 
     # Fint Maximum
     fQuad = -a1/(2*a2)
@@ -780,16 +774,17 @@ def fftQuadraticInterpolation(X_f, f, **kwargs):
     return fQuad, k
 
 def bandwidthEstimator( psd, f, threshold ):
-    """
-    Estimate the bandwidth of an incomming signal in the frequency domain.
+    """Estimate the bandwidth of an incomming signal in the frequency domain.
 
-    psd is the frequency domain signal to be analyzed (dB scale).
-    xAxis is the time or frequency axis.
-    threshold is the power rollof at which the bandwidth is defined in dB.
-
-    Returns center frequency and threshold dB bandwidth.
-    """
-    
+    :param psd: The frequency domain signal to be analyzed (dB scale)
+    :type psd: ndarray, vector
+    :param f: The corresponding frequency vector
+    :type f: ndarray, vector
+    :param threshold: The power rollof at which the bandwidth is defined in dB
+    :type threshold: scalar
+    :return: fCenter, bw, fUpper, fLower, fCenterIndex, fUpperIndex, fLowerIndex
+    :rtype: set of scalars
+    """    
     fDelta = (f[-1]-f[0])/(len(f)-1)
 
     fCenter, fCenterIndex = fftQuadraticInterpolation(np.sqrt(util.db2pow(psd)), f)
@@ -808,16 +803,20 @@ def bandwidthEstimator( psd, f, threshold ):
 
 
 def inspectPackage( sig_t, Fs, T, **kwargs ):
-    """
-    Estimate the number of unique symbols (pulses) in a packet
+    """Estimate the number of unique symbols (pulses) in a packet
 
-    sig_t is the extracted packet in time domain
-    Fs  is the sampling frequency [Hz]
-    T is the symbol periond [s]
-    
-    Returns:
-    packet as a vector of symbols. Symbols are numbered as they appear in the signal.
+    :param sig_t: The extracted packet in time domain
+    :type sig_t: time series
+    :param Fs: The sampling frequency [Hz]
+    :type Fs: scalar
+    :param T: The symbol periond [s]
+    :type T: scalar
+    :return: The packet as a vector of symbols. Symbols are numbered as they appear in the signal.
     symbolAlpahebt, a vector of the time domain symbols.
+    :rtype: set of two vectors
+
+    :Keyword Arguments:
+        * *threshold* (scalar) -- The threshhold for which two sybls are deemed identical
     """
     threshold = kwargs.get('threshold', 0.75)
 

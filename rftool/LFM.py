@@ -17,18 +17,27 @@ import rftool.utility as util
 import rftool.estimation as estimate
 
 class chirp:
-    """
-    Object for generating a set of linear chirps
+    """Object for generating a set of linear chirps
     """
     t = None
     T = None
 
     def __init__( self, Fs=1e3, T=1, fStart=1, fStop=10, nChirps=16, **kwargs):
         """
-        T is the chirp duration [s].
-        Fs is the intended sampling frequency [Hz]. Fs must be at last twice the highest frequency in the input PSD. If Fs < 2*max(f), then Fs = 2*max(f)
-        nChirps is the number of chirps to be generated
-        direction is the chirp direction, 'up', 'down', or 'both'
+
+        :param Fs: The intended sampling frequency [Hz]. Fs must be at last twice the highest frequency in the input PSD. If Fs < 2*max(f), then Fs = 2*max(f), defaults to 1e3
+        :type Fs: scalar, optional
+        :param T: the chirp duration [s], defaults to 1
+        :type T: scalar, optional
+        :param fStart: Starting frequency, defaults to 1
+        :type fStart: scalar, optional
+        :param fStop: Stop frequency, defaults to 10
+        :type fStop: scalar, optional
+        :param nChirps: The number of chirps to be generated, defaults to 16
+        :type nChirps: int, optional
+
+        :Keyword Arguments:
+        * *direction* (str) -- The chirp direction, 'up', 'down', or 'both'
         """
         self.direction = kwargs.get('direction', 'both')
         
@@ -47,6 +56,8 @@ class chirp:
         self.getPrimaryChirp()
 
     def getPrimaryChirp(self):
+        """Generate the primary LFM chirp with no delay.
+        """
         self.omega_t = np.linspace( self.fStart, self.fStop, np.intc(self.T*self.Fs) )
 
         # Delay for each symbol in samples
@@ -58,8 +69,12 @@ class chirp:
             self.symbolDelay = np.linspace(0, self.points-(self.points/(self.nChirps)), np.intc(self.nChirps))
 
     def getSymbolSig(self, symbol):
-        """
-        Generate chirps.
+        """Generate chirps for specified symbols.
+
+        :param symbol: Symbol
+        :type symbol: integer
+        :return: The chirp of the specified symbol
+        :rtype: ndarray, time series
         """
         omega_t = self.omega_t
 
@@ -73,11 +88,6 @@ class chirp:
         phi_t = util.indefIntegration( omega_t, self.dt )
         sig = np.exp(np.multiply(1j*2*np.pi, phi_t))
         sig = np.roll( sig, np.intc(self.symbolDelay[symbol]) )
-        #! Debug code
-        """plt.figure()
-        plt.plot(sig)
-        plt.show()"""
-        #! Debug code
         return sig
 
     def getSymbolIF(self, symbol):
