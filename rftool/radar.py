@@ -18,10 +18,10 @@ def Albersheim( Pfa, Pd, N ):
     """
     Calculate required SNR for non-coherent integration over N pulses, by use of Albersheims equation.
 
-    Pd is the probability of detection (linear)
-    Pfa is the probability of false alarm (linear)
-    N is the number of non-coherently integrated pulses
-    Returns SNR in dB
+    :param Pd: The probability of detection (linear).
+    :param Pfa: The probability of false alarm (linear).
+    :param N: The number of non-coherently integrated pulses.
+    :return: Required SNR in dB.
 
     Accurate within 0.2 dB for:
     10^-7   <  Pfa  < 10^-3
