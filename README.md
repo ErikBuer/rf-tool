@@ -16,7 +16,7 @@ https://rf-tool.readthedocs.io/
 
 ## Basic Usage:
 Use the help() function for description of inputs and valid ranges of the functions.
-Velow are some of the supported functions.
+Below are some of the supported functions.
 ### PCB Tools
 ```
 import rftool.pcb as pcb
