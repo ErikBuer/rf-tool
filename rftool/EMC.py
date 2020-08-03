@@ -11,6 +11,7 @@ def LisnImpedance():
 
     .. highlight:: python
     .. code-block:: python
+    
         import matplotlib.pyplot as plt
         from rftool import LisnImpedance
 

@@ -19,6 +19,7 @@ def effectivePermittivityHJ( h, w, e_r ):
         :scale: 150
         :proportional:  
         :textual:
+        
                            w
                        <-------->
             e_0        +--------+                   
@@ -53,6 +54,7 @@ def Z01HJ( h, w, e_r ):
         :scale: 150
         :proportional:
         :textual:
+
                            w
                        <-------->
             e_0        +--------+                   
@@ -90,6 +92,7 @@ def microstripImpedanceHJ( h, w, e_r ):
         :scale: 150
         :proportional:
         :textual:
+
                            w
                        <-------->
             e_0        +--------+                   
@@ -128,6 +131,7 @@ def effectiveStripWidthHJ( h, w, t, e_r ):
         :aspect: 60
         :scale: 150
         :proportional:
+        
                            w
                        <-------->
             e_0        +--------+                   ^
@@ -219,6 +223,7 @@ def effectivePermittivityYa( h, w, e_r, f ):
         :scale: 150
         :proportional:
         :textual:
+
                             w
                        <-------->
              e_0       +--------+                   
@@ -259,6 +264,7 @@ def microstripImpedanceYa( h, w, e_r, f ):
         :scale: 150
         :proportional:
         :textual:
+
                            w
                        <-------->
              e_0       +--------+                   
@@ -299,6 +305,7 @@ def microstripImpedanceKJ( h, w, e_r, f ):
         :scale: 150
         :proportional:
         :textual:
+
                            w
                        <-------->
              e_0       +--------+                   
