@@ -1,3 +1,5 @@
+[![Downloads](https://pepy.tech/badge/rf-tool)](https://pepy.tech/project/rf-tool)
+
 # rf-tool
 RF electronics calculator.
 Developed for python 3.
