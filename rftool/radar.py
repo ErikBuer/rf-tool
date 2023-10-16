@@ -86,7 +86,7 @@ def Shnidman( Pfa, Pd, N, SW ):
                 K = 2*N
 
         C1 = np.divide( ( (17.7006*Pd-18.4496)*Pd+14.5339 )*Pd-3.525, K(SW) )
-        C2 = np.divide(1,K(SW))*( np.exp( 27.31*Pd-25.14 ) + (Pd-0.8)*( 0.7*np.log( np.divide(10e-5, Pfa) ) + np.divide( 2*N-20, 80 ) ) )
+        C2 = np.divide(1,K(SW))*( np.exp( 27.31*Pd-25.14 ) + (Pd-0.8)*( 0.7*np.log( np.divide(1e-5, Pfa) ) + np.divide( N-10, 40 ) ) )
         CdB = 0
         if Pd < 0.8872:
             CdB = C1
